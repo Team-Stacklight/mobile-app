@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
+import StandardHeader from '@/components/StandardHeader';
 
 interface ProfileOption {
   id: string;
@@ -86,18 +87,7 @@ function ProfileOption({ option, onPress }: { option: ProfileOption; onPress: ()
   );
 }
 
-function Header() {
-  const textColor = useThemeColor({}, 'text');
 
-  return (
-    <View style={styles.header}>
-      <ThemedText style={[styles.headerTitle, { color: textColor }]}>Profile</ThemedText>
-      <TouchableOpacity style={styles.settingsButton}>
-        <Ionicons name="settings-outline" size={24} color={textColor} />
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 export default function ProfileScreen() {
   const backgroundColor = useThemeColor({}, 'background');
@@ -182,7 +172,14 @@ export default function ProfileScreen() {
   return (
     <AnimatedScreenWrapper>
       <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right', 'top']}>
-        <Header />
+        <StandardHeader 
+          title="Profile" 
+          rightIcon="settings-outline" 
+          onRightIconPress={() => {
+            // Settings functionality can be added here
+            console.log('Settings pressed');
+          }} 
+        />
         
         <ScrollView 
           style={styles.content}

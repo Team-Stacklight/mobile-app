@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
+import StandardHeader from '@/components/StandardHeader';
 
 interface Chat {
   id: string;
@@ -71,15 +72,7 @@ function ChatItem({ chat, onPress }: { chat: Chat; onPress: () => void }) {
   );
 }
 
-function Header() {
-  const textColor = useThemeColor({}, 'text');
 
-  return (
-    <View style={styles.header}>
-      <ThemedText style={styles.headerTitle}>Chats</ThemedText>
-    </View>
-  );
-}
 
 export default function ChatListScreen() {
   const router = useRouter();
@@ -105,7 +98,7 @@ export default function ChatListScreen() {
   return (
     <AnimatedScreenWrapper>
       <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right', "top"]}>
-        <Header />
+        <StandardHeader title="Chats" />
 
         <ScrollView
           style={styles.chatList}

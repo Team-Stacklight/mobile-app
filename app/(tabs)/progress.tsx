@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
+import StandardHeader from '@/components/StandardHeader';
 
 interface Module {
   id: string;
@@ -69,18 +70,7 @@ function ModuleCard({ module }: { module: Module }) {
   );
 }
 
-function Header() {
-  const textColor = useThemeColor({}, 'text');
 
-  return (
-    <View style={styles.header}>
-      <ThemedText style={[styles.headerTitle, { color: textColor }]}>Progress</ThemedText>
-      <TouchableOpacity style={styles.settingsButton}>
-        <Ionicons name="settings-outline" size={24} color={textColor} />
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 export default function ProgressScreen() {
   const backgroundColor = useThemeColor({}, 'background');
@@ -129,7 +119,14 @@ export default function ProgressScreen() {
   return (
     <AnimatedScreenWrapper>
       <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right', 'top']}>
-        <Header />
+        <StandardHeader 
+          title="Progress" 
+          rightIcon="settings-outline" 
+          onRightIconPress={() => {
+            // Settings functionality can be added here
+            console.log('Settings pressed');
+          }} 
+        />
         
         <ScrollView 
           style={styles.content}

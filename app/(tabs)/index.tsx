@@ -1,37 +1,20 @@
 import { Image } from 'expo-image';
 import React from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
+import StandardHeader from '@/components/StandardHeader';
+import ParallaxScrollView from '@/components/ParallaxScrollView';
+import StatCard from '@/components/StatCard';
+import StatCardGrid from '@/components/StatCardGrid';
 
-function Header() {
-  const textColor = useThemeColor({}, 'text');
-  
-  return (
-    <View style={styles.header}>
-      <TouchableOpacity style={styles.menuButton}>
-        <Ionicons name="menu" size={24} color={textColor} />
-      </TouchableOpacity>
-      <ThemedText type="title" style={styles.headerTitle}>Dashboard</ThemedText>
-      <View style={styles.headerSpacer} />
-    </View>
-  );
-}
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
-  const cardBackgroundColor = useThemeColor({ light: '#F3F4F6', dark: '#2A2D31' }, 'background');
-  
-  return (
-    <View style={[styles.statCard, { backgroundColor: cardBackgroundColor }]}>
-      <ThemedText style={styles.statTitle}>{title}</ThemedText>
-      <ThemedText style={styles.statValue}>{String(value)}</ThemedText>
-    </View>
-  );
-}
+
+
 
 function ActivityItem({
   title,
@@ -62,9 +45,30 @@ function ActivityItem({
 export default function DashboardScreen() {
   return (
     <AnimatedScreenWrapper>
+     
       <ThemedView style={styles.screenContainer}>
-        <Header />
-        <ScrollView contentContainerStyle={styles.container}>
+        {/* Fixed Navigation Header */}
+        <StandardHeader 
+          title="Dashboard" 
+          rightIcon="menu" 
+          onRightIconPress={() => {
+            // Menu functionality can be added here
+            console.log('Menu pressed');
+          }} 
+        />
+        
+        {/* Scrollable Content */}
+        <ParallaxScrollView
+          headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+          headerImage={
+            <Image
+              source={require('@/assets/images/header.png')}
+              style={styles.reactLogo}
+            />
+          }
+          overlayTitle="Welcome back!"
+          overlaySubtitle="Ready to continue your learning journey?"
+        >
         {/* Today's Focus */}
         <ThemedText style={styles.sectionTitle}>Today's Focus</ThemedText>
         
@@ -88,13 +92,53 @@ export default function DashboardScreen() {
 
         {/* Progress Overview */}
         <ThemedText style={styles.sectionTitle}>Progress Overview</ThemedText>
-        <View style={styles.statsGrid}>
-          <StatCard title="Courses Completed" value={5} />
-          <StatCard title="Hours Spent Learning" value={12} />
-        </View>
-        <View style={styles.statsRow}>
-          <StatCard title="Skills Developed" value={3} />
-        </View>
+        <StatCardGrid
+          cards={[
+            {
+              title: "Courses Completed",
+              value: "12",
+              backgroundImage: require('@/assets/images/course.png'),
+              overlayOpacity: 0.7,
+              overlayColor: "rgba(0, 0, 0, 0.5)",
+              icon: "school-outline",
+              iconColor: "#22c55e",
+              trend: "up",
+              trendValue: "+2 this week"
+            },
+            {
+              title: "Hours Studied",
+              value: "47",
+              backgroundImage: require('@/assets/images/clock.png'),
+              overlayOpacity: 0.7,
+              overlayColor: "rgba(0, 0, 0, 0.5)",
+              icon: "time-outline",
+              iconColor: "#3b82f6",
+              subtitle: "This month"
+            },
+            {
+              title: "Current Streak",
+              value: "5 days",
+              backgroundImage: require('@/assets/images/streak.png'),
+              overlayOpacity: 0.7,
+              overlayColor: "rgba(0, 0, 0, 0.5)",
+              icon: "flame-outline",
+              iconColor: "#f59e0b",
+              trend: "up",
+              trendValue: "Best: 12 days"
+            },
+            {
+              title: "Points Earned",
+              value: "2,340",
+              backgroundImage: require('@/assets/images/points.png'),
+              overlayOpacity: 0.7,
+              overlayColor: "rgba(0, 0, 0, 0.5)",
+              trend: "up",
+              trendValue: "+180 today",
+            }
+          ]}
+          columns={2}
+          spacing={8}
+        />
 
         {/* Recent Activity */}
         <ThemedText style={styles.sectionTitle}>Recent Activity</ThemedText>
@@ -118,8 +162,9 @@ export default function DashboardScreen() {
 
         {/* bottom spacing */}
         <View style={{ height: 100 }} />
-        </ScrollView>
+        </ParallaxScrollView>
       </ThemedView>
+      
     </AnimatedScreenWrapper>
   );
 }
@@ -130,10 +175,20 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 60, // Account for status bar
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 70,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  reactLogo: {
+    height: "100%",
+    width: "100%",
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
   },
   menuButton: {
     padding: 8,
@@ -148,9 +203,49 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
   },
+  headerImageContainer: {
+    height: 200,
+    marginHorizontal: 16,
+    marginTop: -20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    padding: 20,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: 'white',
+    marginBottom: 4,
+  },
+  subtitleText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
+  contentWrapper: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
   container: {
     padding: 16,
     gap: 20,
+    paddingTop: 0,
   },
   sectionTitle: {
     fontSize: 24,
@@ -239,6 +334,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  settingsButton: {
+    padding: 4,
   },
   activityTitle: {
     fontSize: 16,
