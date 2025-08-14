@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +17,25 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useChat } from '@/contexts/ChatContext';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
-interface Message {
-  id: string;
-  text: string;
-  isBot: boolean;
-  timestamp: Date;
+interface ChatMessage {
+  _id: string;
+  content: string;
+  sender: {
+    _id: string;
+    username: string;
+    email: string;
+  };
+  chatRoom: string;
+  messageType: 'text' | 'image' | 'file';
+  readBy: Array<{
+    user: string;
+    readAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 function BotAvatar() {
@@ -43,17 +57,35 @@ function UserAvatar() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
-  const bubbleBackgroundColor = message.isBot ? '#F3F4F6' : '#007AFF';
-  const textColor = message.isBot ? '#000' : '#FFF';
+function MessageBubble({ message, currentUserId }: { message: ChatMessage; currentUserId: string }) {
+  const isCurrentUser = message.sender._id === currentUserId;
+  const bubbleBackgroundColor = isCurrentUser ? '#007AFF' : '#F3F4F6';
+  const textColor = isCurrentUser ? '#FFF' : '#000';
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <View style={[styles.messageContainer, message.isBot ? styles.botMessage : styles.userMessage]}>
-      {message.isBot && <BotAvatar />}
-      <View style={[styles.messageBubble, { backgroundColor: bubbleBackgroundColor }]}>
-        <ThemedText style={[styles.messageText, { color: textColor }]}>{message.text}</ThemedText>
+    <View style={[styles.messageContainer, isCurrentUser ? styles.userMessage : styles.botMessage]}>
+      {!isCurrentUser && (
+        <View style={styles.senderAvatar}>
+          <ThemedText style={styles.senderAvatarText}>
+            {message.sender.username.charAt(0).toUpperCase()}
+          </ThemedText>
+        </View>
+      )}
+      <View style={styles.messageContent}>
+        {!isCurrentUser && (
+          <ThemedText style={styles.senderName}>{message.sender.username}</ThemedText>
+        )}
+        <View style={[styles.messageBubble, { backgroundColor: bubbleBackgroundColor }]}>
+          <ThemedText style={[styles.messageText, { color: textColor }]}>{message.content}</ThemedText>
+        </View>
+        <ThemedText style={styles.messageTime}>{formatTime(message.createdAt)}</ThemedText>
       </View>
-      {!message.isBot && <UserAvatar />}
+      {isCurrentUser && <UserAvatar />}
     </View>
   );
 }
@@ -75,55 +107,69 @@ function Header({ chatName }: { chatName: string }) {
 }
 
 export default function ChatConversationScreen() {
-  const { chatName = 'Questie' } = useLocalSearchParams<{ chatName: string }>();
+  const { chatName = 'Chat', chatRoomId } = useLocalSearchParams<{ 
+    chatName: string; 
+    chatRoomId: string; 
+  }>();
   
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: `Hi there, I'm ${chatName}! I'm here to help you learn and grow in your role. What would you like to learn today?`,
-      isBot: true,
-      timestamp: new Date(),
-    },
-    {
-      id: '2',
-      text: `Hi ${chatName}, I'd like to learn more about project management.`,
-      isBot: false,
-      timestamp: new Date(),
-    },
-    {
-      id: '3',
-      text: "Great choice! Project management is a valuable skill. To get started, would you like to focus on the fundamentals, or a specific aspect like Agile methodologies?",
-      isBot: true,
-      timestamp: new Date(),
-    },
-  ]);
-
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const scrollViewRef = useRef<ScrollView>(null);
+  
   const backgroundColor = useThemeColor({}, 'background');
   const inputBackgroundColor = useThemeColor({ light: '#F3F4F6', dark: '#2A2D31' }, 'background');
   const textColor = useThemeColor({}, 'text');
+  
+  const { getChatMessages, sendMessage: sendChatMessage, joinRoom, leaveRoom } = useChat();
+  const { user } = useSimpleAuth();
 
-  const sendMessage = () => {
-    if (inputText.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText.trim(),
-        isBot: false,
-        timestamp: new Date(),
+  // Load messages on mount and join room
+  useEffect(() => {
+    if (chatRoomId && user) {
+      loadMessages();
+      joinRoom(chatRoomId);
+      
+      return () => {
+        leaveRoom(chatRoomId);
       };
-      setMessages([...messages, newMessage]);
-      setInputText('');
+    }
+  }, [chatRoomId, user]);
 
-      // Simulate bot response
+  // For hackathon: Mock mode - no socket listeners needed
+  // Real-time updates will be handled by the mock ChatContext
+
+  const loadMessages = async () => {
+    try {
+      setLoading(true);
+      const chatMessages = await getChatMessages(chatRoomId);
+      setMessages(chatMessages);
+      // Auto scroll to bottom after loading
       setTimeout(() => {
-        const botResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "Thanks for your message! I'm processing your request and will help you learn more about that topic.",
-          isBot: true,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, botResponse]);
-      }, 1000);
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load messages. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (inputText.trim() && chatRoomId) {
+      const messageContent = inputText.trim();
+      setInputText('');
+      
+      try {
+        await sendChatMessage(chatRoomId, messageContent);
+        // Message will be added via socket listener
+      } catch (error) {
+        console.error('Error sending message:', error);
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+        // Restore input text on error
+        setInputText(messageContent);
+      }
     }
   };
 
@@ -139,13 +185,29 @@ export default function ChatConversationScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.messagesContainer}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
         >
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ThemedText style={styles.loadingText}>Loading messages...</ThemedText>
+            </View>
+          ) : messages.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
+              <ThemedText style={styles.emptySubtext}>Start the conversation!</ThemedText>
+            </View>
+          ) : (
+            messages.map((message) => (
+              <MessageBubble 
+                key={message._id} 
+                message={message} 
+                currentUserId={user?._id || ''}
+              />
+            ))
+          )}
         </ScrollView>
         
         {/* INPUT AREA */}
@@ -289,11 +351,69 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: '#007AFF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  senderAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  senderAvatarText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  messageContent: {
+    flex: 1,
+  },
+  senderName: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  messageTime: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
 });

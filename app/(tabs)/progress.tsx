@@ -118,7 +118,7 @@ export default function ProgressScreen() {
 
   return (
     <AnimatedScreenWrapper>
-      <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right']}>
         <StandardHeader 
           title="Progress" 
           rightIcon="settings-outline" 

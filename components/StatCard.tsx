@@ -196,12 +196,12 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 1,
   },
   statTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
