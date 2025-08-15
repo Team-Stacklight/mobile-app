@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,17 +16,29 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
 import StandardHeader from '@/components/StandardHeader';
+import { useChat } from '@/contexts/ChatContext';
 
-interface Chat {
-  id: string;
-  name: string;
-  lastMessage: string;
-  timestamp: string;
-  unreadCount?: number;
+interface ChatRoom {
+  _id: string;
+  name?: string;
+  isGroup: boolean;
+  participants: Array<{
+    _id: string;
+    username: string;
+    email: string;
+  }>;
+  lastMessage?: {
+    content: string;
+    createdAt: string;
+    sender: {
+      username: string;
+    };
+  };
+  createdAt: string;
 }
 
 function ChatAvatar({ name }: { name: string }) {
-  if (name === 'Questie') {
+  if (name === 'Collective Minds') {
     return (
       <View style={styles.chatAvatar}>
         <Image
@@ -44,27 +57,52 @@ function ChatAvatar({ name }: { name: string }) {
   );
 }
 
-function ChatItem({ chat, onPress }: { chat: Chat; onPress: () => void }) {
+function ChatItem({ chatRoom, onPress }: { chatRoom: ChatRoom; onPress: () => void }) {
   const textColor = useThemeColor({}, 'text');
   const subtextColor = useThemeColor({ light: '#6B7280', dark: '#9CA3AF' }, 'text');
+  
+  // Get chat display name
+  const getChatName = () => {
+    if (chatRoom.isGroup && chatRoom.name) {
+      return chatRoom.name;
+    }
+    // For 1:1 chats, use the other participant's name
+    return chatRoom.participants[0]?.username || 'Unknown User';
+  };
+  
+  // Format timestamp
+  const formatTimestamp = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 1) return 'now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <TouchableOpacity style={styles.chatItem} onPress={onPress}>
-      <ChatAvatar name={chat.name} />
+      <ChatAvatar name={getChatName()} />
       <View style={styles.chatContent}>
         <View style={styles.chatHeader}>
-          <ThemedText style={[styles.chatName, { color: textColor }]}>{chat.name}</ThemedText>
-          <ThemedText style={[styles.chatTime, { color: subtextColor }]}>{chat.timestamp}</ThemedText>
+          <ThemedText style={[styles.chatName, { color: textColor }]}>{getChatName()}</ThemedText>
+          <ThemedText style={[styles.chatTime, { color: subtextColor }]}>
+            {chatRoom.lastMessage 
+              ? formatTimestamp(chatRoom.lastMessage.createdAt)
+              : formatTimestamp(chatRoom.createdAt)
+            }
+          </ThemedText>
         </View>
         <View style={styles.chatFooter}>
           <ThemedText style={[styles.lastMessage, { color: subtextColor }]} numberOfLines={1}>
-            {chat.lastMessage}
+            {chatRoom.lastMessage?.content || 'No messages yet'}
           </ThemedText>
-          {chat.unreadCount && chat.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <ThemedText style={styles.unreadText}>{chat.unreadCount}</ThemedText>
-            </View>
-          )}
         </View>
       </View>
       <Ionicons name="chevron-forward" size={20} color={subtextColor} />
@@ -77,40 +115,68 @@ function ChatItem({ chat, onPress }: { chat: Chat; onPress: () => void }) {
 export default function ChatListScreen() {
   const router = useRouter();
   const backgroundColor = useThemeColor({}, 'background');
+  const { chatRooms, loading, getChatRooms } = useChat();
 
-  const chats: Chat[] = [
-    {
-      id: '1',
-      name: 'Questie',
-      lastMessage: 'Hi there! I\'m here to help you learn and grow in your role.',
-      timestamp: '2m ago',
-      unreadCount: 2,
-    },
-  ];
+  // Refresh chat rooms on mount
+  useEffect(() => {
+    getChatRooms();
+  }, []);
 
-  const openChat = (chat: Chat) => {
+  const openChat = (chatRoom: ChatRoom) => {
+    const chatName = chatRoom.isGroup && chatRoom.name 
+      ? chatRoom.name 
+      : chatRoom.participants[0]?.username || 'Unknown User';
+      
     router.push({
       pathname: '/chat-conversation',
-      params: { chatName: chat.name },
+      params: { 
+        chatRoomId: chatRoom._id,
+        chatName: chatName 
+      },
     });
+  };
+
+  const handleNewChat = () => {
+    router.push('/new-chat');
   };
 
   return (
     <AnimatedScreenWrapper>
-      <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right', "top"]}>
-        <StandardHeader title="Chats" />
+      <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right']}>
+        <View style={[styles.header, { borderBottomColor: useThemeColor({ light: '#E5E7EB', dark: '#374151' }, 'text') }]}>
+          <ThemedText style={styles.headerTitle}>Chats</ThemedText>
+          <TouchableOpacity onPress={handleNewChat} style={styles.newChatButton}>
+            <Ionicons name="add" size={24} color={useThemeColor({}, 'text')} />
+          </TouchableOpacity>
+        </View>
 
         <ScrollView
           style={styles.chatList}
           showsVerticalScrollIndicator={false}
-        >
-          {chats.map((chat) => (
-            <ChatItem
-              key={chat.id}
-              chat={chat}
-              onPress={() => openChat(chat)}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={getChatRooms}
             />
-          ))}
+          }
+        >
+          {chatRooms.length === 0 && !loading ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={64} color="#9CA3AF" />
+              <ThemedText style={styles.emptyStateText}>No chats yet</ThemedText>
+              <ThemedText style={styles.emptyStateSubtext}>
+                Tap the + button to start a new conversation
+              </ThemedText>
+            </View>
+          ) : (
+            chatRooms.map((chatRoom) => (
+              <ChatItem
+                key={chatRoom._id}
+                chatRoom={chatRoom}
+                onPress={() => openChat(chatRoom)}
+              />
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
     </AnimatedScreenWrapper>
@@ -133,6 +199,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#000000',
+    flex: 1,
+  },
+  newChatButton: {
+    padding: 4,
   },
   chatList: {
     flex: 1,
@@ -204,5 +274,26 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 64,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+    color: '#6B7280',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    color: '#9CA3AF',
   },
 });

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
 import StandardHeader from '@/components/StandardHeader';
+import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
 interface ProfileOption {
   id: string;
@@ -21,6 +22,7 @@ interface ProfileOption {
 function ProfileHeader() {
   const textColor = useThemeColor({}, 'text');
   const subtextColor = useThemeColor({ light: '#6B7280', dark: '#9CA3AF' }, 'text');
+  const { user } = useSimpleAuth();
 
   return (
     <View style={styles.profileHeader}>
@@ -34,8 +36,12 @@ function ProfileHeader() {
         </TouchableOpacity>
       </View>
       <View style={styles.profileInfo}>
-        <ThemedText style={[styles.profileName, { color: textColor }]}>Alex Johnson</ThemedText>
-        <ThemedText style={[styles.profileEmail, { color: subtextColor }]}>alex.johnson@example.com</ThemedText>
+        <ThemedText style={[styles.profileName, { color: textColor }]}>
+          {user?.username || 'User'}
+        </ThemedText>
+        <ThemedText style={[styles.profileEmail, { color: subtextColor }]}>
+          {user?.email || 'No email'}
+        </ThemedText>
         <View style={styles.profileStats}>
           <View style={styles.statItem}>
             <ThemedText style={[styles.statNumber, { color: textColor }]}>12</ThemedText>
@@ -91,6 +97,31 @@ function ProfileOption({ option, onPress }: { option: ProfileOption; onPress: ()
 
 export default function ProfileScreen() {
   const backgroundColor = useThemeColor({}, 'background');
+  const { user, logout } = useSimpleAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const accountOptions: ProfileOption[] = [
     {
@@ -150,13 +181,18 @@ export default function ProfileScreen() {
   const otherOptions: ProfileOption[] = [
     {
       id: '8',
-      title: 'About',
-      subtitle: 'Learn more about Questie',
-      icon: 'information-circle-outline',
+      title: 'Terms of Service',
+      icon: 'document-text-outline',
       color: '#6B7280',
     },
     {
       id: '9',
+      title: 'Privacy Policy',
+      icon: 'lock-closed-outline',
+      color: '#6B7280',
+    },
+    {
+      id: '10',
       title: 'Sign Out',
       icon: 'log-out-outline',
       color: '#EF4444',
@@ -165,13 +201,18 @@ export default function ProfileScreen() {
   ];
 
   const handleOptionPress = (optionId: string) => {
-    console.log('Option pressed:', optionId);
-    // Handle navigation or action based on optionId
+    if (optionId === '10') {
+      // Handle logout
+      handleLogout();
+    } else {
+      console.log('Option pressed:', optionId);
+      // Handle navigation or action based on optionId
+    }
   };
 
   return (
     <AnimatedScreenWrapper>
-      <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['left', 'right']}>
         <StandardHeader 
           title="Profile" 
           rightIcon="settings-outline" 
@@ -231,7 +272,7 @@ export default function ProfileScreen() {
 
           {/* Version Info */}
           <View style={styles.versionContainer}>
-            <ThemedText style={styles.versionText}>Questie v1.0.0</ThemedText>
+            <ThemedText style={styles.versionText}>Collective Minds v1.0.0</ThemedText>
           </View>
 
           {/* Bottom spacing */}

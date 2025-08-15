@@ -1,8 +1,8 @@
-# Questie 🎯
+# Collective Minds 🧠
 
 **A modern learning companion app built with React Native and Expo**
 
-Questie is an intuitive mobile application designed to enhance your learning journey with personalized AI assistance, progress tracking, and seamless user experience. Built with cutting-edge React Native technology and featuring smooth animations and modern UI design.
+Collective Minds is an intuitive mobile application designed to enhance your learning journey with personalized AI assistance, progress tracking, and seamless user experience. Built with cutting-edge React Native technology and featuring smooth animations and modern UI design.
 
 ## ✨ Features
 
@@ -13,7 +13,7 @@ Questie is an intuitive mobile application designed to enhance your learning jou
 - **Modern UI**: Clean, card-based layout with themed components
 
 ### 💬 **AI Chat Assistant**
-- **Questie Bot**: Intelligent learning companion with avatar integration
+- **Collective Minds Bot**: Intelligent learning companion with avatar integration
 - **Real-time Conversations**: Smooth chat interface with message bubbles
 - **Modal Navigation**: Full-screen chat experience with custom headers
 - **Keyboard Optimization**: Proper keyboard handling and safe area support
@@ -146,7 +146,7 @@ npm run type-check # Run TypeScript checks
 
 ## 🤝 Contributing
 
-We welcome contributions to Questie! Please follow these steps:
+We welcome contributions to Collective Minds! Please follow these steps:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
