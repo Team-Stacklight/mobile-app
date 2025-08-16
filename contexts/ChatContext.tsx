@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useSimpleAuth } from './SimpleAuthContext';
+import { ChatApiService } from '../services/chatApi';
+import { WebSocketService, WebSocketMessage } from '../services/websocketService';
 
 // Mock chat interfaces for hackathon demo
 interface ChatUser {
@@ -41,16 +43,23 @@ interface ChatRoom {
 interface ChatContextType {
   chatRooms: ChatRoom[];
   loading: boolean;
+  messages: { [chatRoomId: string]: ChatMessage[] };
+  isConnected: boolean;
   createChatRoom: (participants: string[], isGroup?: boolean, name?: string) => Promise<ChatRoom>;
   getChatRooms: () => Promise<void>;
   getChatMessages: (chatRoomId: string) => Promise<ChatMessage[]>;
   sendMessage: (chatRoomId: string, content: string) => Promise<void>;
   searchUsers: (query: string) => Promise<ChatUser[]>;
-  joinRoom: (chatRoomId: string) => void;
+  joinRoom: (chatRoomId: string) => Promise<boolean>;
   leaveRoom: (chatRoomId: string) => void;
+  connectToRoom: (chatRoomId: string) => Promise<boolean>;
+  disconnectFromRoom: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+// Available chat room - using the provided room ID
+const AVAILABLE_ROOM_ID = 'a36c864f-3db2-473b-9122-216324c1563a';
 
 // Mock chat data for hackathon demo
 const MOCK_CHAT_USERS: ChatUser[] = [
@@ -90,59 +99,39 @@ const MOCK_CHAT_USERS: ChatUser[] = [
 
 const MOCK_CHAT_ROOMS: ChatRoom[] = [
   {
-    _id: 'questie-chat',
-    name: 'Collective Minds',
-    description: 'Chat with your AI learning assistant',
-    isGroup: false,
-    participants: [MOCK_CHAT_USERS[0], MOCK_CHAT_USERS[3]],
-    admins: [MOCK_CHAT_USERS[3]],
+    _id: AVAILABLE_ROOM_ID,
+    name: 'Ethics Discussion',
+    description: 'Room 1 - Ethics topic discussion',
+    isGroup: true,
+    participants: [MOCK_CHAT_USERS[0], MOCK_CHAT_USERS[1]],
+    admins: [MOCK_CHAT_USERS[0]],
     lastMessage: {
       _id: 'msg1',
-      content: 'Hello! How can I help you with your learning today?',
-      sender: MOCK_CHAT_USERS[3],
-      chatRoom: 'questie-chat',
+      content: 'Welcome to the Ethics discussion room!',
+      sender: MOCK_CHAT_USERS[0],
+      chatRoom: AVAILABLE_ROOM_ID,
       messageType: 'text',
       readBy: [],
       createdAt: new Date(Date.now() - 300000).toISOString(),
       updatedAt: new Date(Date.now() - 300000).toISOString()
     },
-    createdBy: MOCK_CHAT_USERS[3],
+    createdBy: MOCK_CHAT_USERS[0],
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 300000).toISOString()
   }
 ];
 
-const MOCK_MESSAGES: { [chatRoomId: string]: ChatMessage[] } = {
-  'questie-chat': [
+const INITIAL_MESSAGES: { [chatRoomId: string]: ChatMessage[] } = {
+  [AVAILABLE_ROOM_ID]: [
     {
       _id: 'msg1',
-      content: 'Hello! How can I help you with your learning today?',
-      sender: MOCK_CHAT_USERS[3],
-      chatRoom: 'questie-chat',
+      content: 'Welcome to the Ethics discussion room!',
+      sender: MOCK_CHAT_USERS[0],
+      chatRoom: AVAILABLE_ROOM_ID,
       messageType: 'text',
       readBy: [],
       createdAt: new Date(Date.now() - 300000).toISOString(),
       updatedAt: new Date(Date.now() - 300000).toISOString()
-    },
-    {
-      _id: 'msg2',
-      content: 'I\'m working on my math homework and could use some help!',
-      sender: MOCK_CHAT_USERS[0],
-      chatRoom: 'questie-chat',
-      messageType: 'text',
-      readBy: [],
-      createdAt: new Date(Date.now() - 240000).toISOString(),
-      updatedAt: new Date(Date.now() - 240000).toISOString()
-    },
-    {
-      _id: 'msg3',
-      content: 'Great! I\'d be happy to help with your math homework. What specific topic are you working on?',
-      sender: MOCK_CHAT_USERS[3],
-      chatRoom: 'questie-chat',
-      messageType: 'text',
-      readBy: [],
-      createdAt: new Date(Date.now() - 180000).toISOString(),
-      updatedAt: new Date(Date.now() - 180000).toISOString()
     }
   ]
 };
@@ -157,15 +146,29 @@ export const useChat = () => {
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [messages, setMessages] = useState<{ [chatRoomId: string]: ChatMessage[] }>({});
   const [loading, setLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const { user } = useSimpleAuth();
+  const wsServiceRef = useRef<WebSocketService | null>(null);
+  const currentRoomRef = useRef<string | null>(null);
 
-  // Load mock chat rooms on mount
+  // Load chat rooms and initialize messages on mount
   useEffect(() => {
     if (user) {
       getChatRooms();
+      setMessages(INITIAL_MESSAGES);
     }
   }, [user]);
+
+  // Cleanup WebSocket on unmount
+  useEffect(() => {
+    return () => {
+      if (wsServiceRef.current) {
+        wsServiceRef.current.disconnect();
+      }
+    };
+  }, []);
 
   const createChatRoom = async (participants: string[], isGroup = false, name = ''): Promise<ChatRoom> => {
     try {
@@ -199,16 +202,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const getChatRooms = async () => {
     try {
-      console.log('🎭 Mock: Loading chat rooms...');
+      console.log('📋 Loading chat rooms...');
       setLoading(true);
       
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 500));
       
       setChatRooms(MOCK_CHAT_ROOMS);
-      console.log('✅ Mock: Chat rooms loaded');
+      console.log('✅ Chat rooms loaded');
     } catch (error) {
-      console.error('❌ Mock error fetching chat rooms:', error);
+      console.error('❌ Error fetching chat rooms:', error);
     } finally {
       setLoading(false);
     }
@@ -216,80 +219,59 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const getChatMessages = async (chatRoomId: string): Promise<ChatMessage[]> => {
     try {
-      console.log('🎭 Mock: Loading messages for room:', chatRoomId);
+      console.log('📨 Loading messages for room:', chatRoomId);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const messages = MOCK_MESSAGES[chatRoomId] || [];
-      console.log('✅ Mock: Messages loaded:', messages.length);
-      return messages;
+      // Return messages from state
+      const roomMessages = messages[chatRoomId] || [];
+      console.log('✅ Messages loaded:', roomMessages.length);
+      return roomMessages;
     } catch (error) {
-      console.error('❌ Mock error fetching messages:', error);
+      console.error('❌ Error fetching messages:', error);
       throw error;
     }
   };
 
   const sendMessage = async (chatRoomId: string, content: string) => {
     try {
-      console.log('🎭 Mock: Sending message to room:', chatRoomId, 'content:', content);
+      console.log('📤 Sending message to room:', chatRoomId, 'content:', content);
       
-      // Create new message
-      const newMessage: ChatMessage = {
-        _id: `msg_${Date.now()}`,
-        content,
-        sender: MOCK_CHAT_USERS.find(u => u._id === user?.id.toString()) || MOCK_CHAT_USERS[0],
-        chatRoom: chatRoomId,
-        messageType: 'text',
-        readBy: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Add to mock messages
-      if (!MOCK_MESSAGES[chatRoomId]) {
-        MOCK_MESSAGES[chatRoomId] = [];
-      }
-      MOCK_MESSAGES[chatRoomId].push(newMessage);
-      
-      // Update chat room's last message
-      setChatRooms(prevRooms => 
-        prevRooms.map(room => 
-          room._id === chatRoomId 
-            ? { ...room, lastMessage: newMessage, updatedAt: new Date().toISOString() }
-            : room
-        )
-      );
-      
-      // Simulate bot response for Collective Minds chat
-      if (chatRoomId === 'questie-chat') {
-        setTimeout(() => {
-          const botResponse: ChatMessage = {
-            _id: `msg_${Date.now() + 1}`,
-            content: `Thanks for your message! I'm here to help with your learning. ${content.includes('?') ? "That's a great question!" : "Feel free to ask me anything about your studies."}`,
-            sender: MOCK_CHAT_USERS[3], // Collective Minds bot
-            chatRoom: chatRoomId,
-            messageType: 'text',
-            readBy: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          
-          MOCK_MESSAGES[chatRoomId].push(botResponse);
-          
-          setChatRooms(prevRooms => 
-            prevRooms.map(room => 
-              room._id === chatRoomId 
-                ? { ...room, lastMessage: botResponse, updatedAt: new Date().toISOString() }
-                : room
-            )
-          );
-        }, 1000 + Math.random() * 2000); // Random delay 1-3 seconds
+      // Send via WebSocket if connected
+      if (wsServiceRef.current && wsServiceRef.current.isConnected()) {
+        const success = wsServiceRef.current.sendMessage(content);
+        if (!success) {
+          throw new Error('Failed to send message via WebSocket');
+        }
+      } else {
+        // Fallback: Add message locally if not connected
+        const newMessage: ChatMessage = {
+          _id: `msg_${Date.now()}`,
+          content,
+          sender: MOCK_CHAT_USERS.find(u => u._id === user?.id.toString()) || MOCK_CHAT_USERS[0],
+          chatRoom: chatRoomId,
+          messageType: 'text',
+          readBy: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        setMessages(prev => ({
+          ...prev,
+          [chatRoomId]: [...(prev[chatRoomId] || []), newMessage]
+        }));
+        
+        // Update chat room's last message
+        setChatRooms(prevRooms => 
+          prevRooms.map(room => 
+            room._id === chatRoomId 
+              ? { ...room, lastMessage: newMessage, updatedAt: new Date().toISOString() }
+              : room
+          )
+        );
       }
       
-      console.log('✅ Mock: Message sent');
+      console.log('✅ Message sent');
     } catch (error) {
-      console.error('❌ Mock error sending message:', error);
+      console.error('❌ Error sending message:', error);
       throw error;
     }
   };
@@ -314,17 +296,176 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const joinRoom = (chatRoomId: string) => {
-    console.log('🎭 Mock: Joining room:', chatRoomId);
+  const joinRoom = async (chatRoomId: string): Promise<boolean> => {
+    try {
+      if (!user) {
+        console.error('❌ No user found, cannot join room');
+        return false;
+      }
+
+      console.log('🚪 Joining room:', chatRoomId, 'as user:', user.username);
+      
+      const result = await ChatApiService.joinRoom(chatRoomId, user.username);
+      
+      if (result.success) {
+        console.log('✅ Successfully joined room:', chatRoomId);
+        return true;
+      } else {
+        console.error('❌ Failed to join room:', result.message);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error joining room:', error);
+      return false;
+    }
   };
 
   const leaveRoom = (chatRoomId: string) => {
-    console.log('🎭 Mock: Leaving room:', chatRoomId);
+    console.log('🚪 Leaving room:', chatRoomId);
+    disconnectFromRoom();
+  };
+
+  const connectToRoom = async (chatRoomId: string): Promise<boolean> => {
+    try {
+      if (!user) {
+        console.error('❌ No user found, cannot connect to room');
+        return false;
+      }
+
+      // Disconnect from current room if connected
+      if (wsServiceRef.current) {
+        wsServiceRef.current.disconnect();
+      }
+
+      // Try to join the room via API, but continue with WebSocket even if it fails
+      const joinSuccess = await joinRoom(chatRoomId);
+      if (joinSuccess) {
+        console.log('✅ API join successful, proceeding with WebSocket');
+      } else {
+        console.log('⚠️ API join failed, but proceeding with WebSocket connection anyway');
+      }
+
+      // Create WebSocket connection
+      const wsUrl = ChatApiService.getWebSocketUrl(chatRoomId, user.username);
+      console.log('🔌 Connecting to WebSocket:', wsUrl);
+      
+      wsServiceRef.current = new WebSocketService(wsUrl, {
+        onMessage: (wsMessage: any) => {
+          console.log('📨 ChatContext received WebSocket message:', wsMessage);
+          
+          let messageContent = '';
+          let senderName = '';
+          let timestamp = new Date().toISOString();
+          
+          // Handle the nested message structure from the backend
+          if (wsMessage.message && wsMessage.sender) {
+            senderName = wsMessage.sender;
+            
+            // Check if message is double-encoded JSON
+            try {
+              const parsedMessage = JSON.parse(wsMessage.message);
+              if (parsedMessage.content) {
+                messageContent = parsedMessage.content;
+                timestamp = parsedMessage.timestamp || timestamp;
+              } else {
+                messageContent = wsMessage.message;
+              }
+            } catch {
+              // If parsing fails, use the message as-is
+              messageContent = wsMessage.message;
+            }
+          } else if (wsMessage.content) {
+            // Fallback to direct content field
+            messageContent = wsMessage.content;
+            senderName = wsMessage.username || wsMessage.sender || 'Unknown User';
+          }
+          
+          console.log('📨 Extracted - Content:', messageContent, 'Sender:', senderName);
+          
+          if (messageContent) {
+            console.log('📨 Processing message for room:', chatRoomId);
+            
+            const newMessage: ChatMessage = {
+              _id: `ws_msg_${Date.now()}_${Math.random()}`,
+              content: messageContent,
+              sender: {
+                _id: senderName.toLowerCase().replace(' ', '_'),
+                username: senderName,
+                email: '',
+                isOnline: true,
+                lastSeen: new Date().toISOString()
+              },
+              chatRoom: chatRoomId,
+              messageType: 'text',
+              readBy: [],
+              createdAt: timestamp,
+              updatedAt: timestamp
+            };
+            
+            console.log('📨 Created new message object:', newMessage);
+            console.log('📨 Current messages state before update:', messages[chatRoomId]?.length || 0);
+            
+            setMessages(prev => {
+              const updated = {
+                ...prev,
+                [chatRoomId]: [...(prev[chatRoomId] || []), newMessage]
+              };
+              console.log('📨 Updated messages state:', updated[chatRoomId]?.length || 0);
+              return updated;
+            });
+            
+            // Update chat room's last message
+            setChatRooms(prevRooms => 
+              prevRooms.map(room => 
+                room._id === chatRoomId 
+                  ? { ...room, lastMessage: newMessage, updatedAt: new Date().toISOString() }
+                  : room
+              )
+            );
+            
+            console.log('📨 Message processing complete');
+          } else {
+            console.log('📨 Ignoring message - no content found');
+          }
+        },
+        onConnect: () => {
+          console.log('✅ Connected to chat room:', chatRoomId);
+          setIsConnected(true);
+          currentRoomRef.current = chatRoomId;
+        },
+        onDisconnect: () => {
+          console.log('🔌 Disconnected from chat room');
+          setIsConnected(false);
+          currentRoomRef.current = null;
+        },
+        onError: (error) => {
+          console.error('❌ WebSocket error:', error);
+          setIsConnected(false);
+        }
+      });
+      
+      wsServiceRef.current.connect();
+      return true;
+    } catch (error) {
+      console.error('❌ Error connecting to room:', error);
+      return false;
+    }
+  };
+
+  const disconnectFromRoom = () => {
+    if (wsServiceRef.current) {
+      wsServiceRef.current.disconnect();
+      wsServiceRef.current = null;
+    }
+    setIsConnected(false);
+    currentRoomRef.current = null;
   };
 
   const value = {
     chatRooms,
     loading,
+    messages,
+    isConnected,
     createChatRoom,
     getChatRooms,
     getChatMessages,
@@ -332,6 +473,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     searchUsers,
     joinRoom,
     leaveRoom,
+    connectToRoom,
+    disconnectFromRoom,
   };
 
   return (

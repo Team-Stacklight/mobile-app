@@ -121,23 +121,45 @@ export default function ChatConversationScreen() {
   const inputBackgroundColor = useThemeColor({ light: '#F3F4F6', dark: '#2A2D31' }, 'background');
   const textColor = useThemeColor({}, 'text');
   
-  const { getChatMessages, sendMessage: sendChatMessage, joinRoom, leaveRoom } = useChat();
+  const { getChatMessages, sendMessage: sendChatMessage, connectToRoom, disconnectFromRoom, messages: contextMessages, isConnected } = useChat();
   const { user } = useSimpleAuth();
 
-  // Load messages on mount and join room
+  // Load messages on mount and connect to room
   useEffect(() => {
     if (chatRoomId && user) {
       loadMessages();
-      joinRoom(chatRoomId);
+      connectToRoom(chatRoomId);
       
       return () => {
-        leaveRoom(chatRoomId);
+        disconnectFromRoom();
       };
     }
   }, [chatRoomId, user]);
 
-  // For hackathon: Mock mode - no socket listeners needed
-  // Real-time updates will be handled by the mock ChatContext
+  // Update messages when context messages change
+  useEffect(() => {
+    console.log('🔄 Chat conversation: Context messages changed');
+    console.log('🔄 Current chatRoomId:', chatRoomId);
+    console.log('🔄 Context messages for room:', contextMessages[chatRoomId]?.length || 0);
+    
+    if (chatRoomId && contextMessages[chatRoomId]) {
+      const newMessages = contextMessages[chatRoomId];
+      console.log('🔄 Setting messages:', newMessages.length);
+      setMessages(newMessages);
+      
+      // Auto scroll to bottom when new messages arrive
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [contextMessages, chatRoomId]);
+  
+  // Debug: Log when messages state changes
+  useEffect(() => {
+    console.log('🔄 Local messages state changed:', messages.length);
+  }, [messages]);
+
+  // Real-time updates are handled by WebSocket in ChatContext
 
   const loadMessages = async () => {
     try {
@@ -163,7 +185,7 @@ export default function ChatConversationScreen() {
       
       try {
         await sendChatMessage(chatRoomId, messageContent);
-        // Message will be added via socket listener
+        // Message will be added via WebSocket listener or fallback
       } catch (error) {
         console.error('Error sending message:', error);
         Alert.alert('Error', 'Failed to send message. Please try again.');
@@ -177,7 +199,7 @@ export default function ChatConversationScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom', 'top']}>
-        <Header chatName={chatName} />
+        <Header chatName={`${chatName}${isConnected ? ' 🟢' : ' 🔴'}`} />
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
