@@ -1,4 +1,5 @@
-const API_BASE_URL = 'https://api.dhruvshah.se';
+const API_BASE_URL = process.env.EXPO_PUBLIC_HTTP_BASE_URL || 'https://api.dhruvshah.se';
+const WS_BASE_URL = process.env.EXPO_PUBLIC_WS_BASE_URL || 'wss://api.dhruvshah.se';
 
 export interface JoinRoomRequest {
   room_id: string;
@@ -102,7 +103,7 @@ export class ChatApiService {
    * Get WebSocket URL for a room and username
    */
   static getWebSocketUrl(roomId: string, username: string): string {
-    return `wss://api.dhruvshah.se/ws/${roomId}/${username}`;
+    return `${WS_BASE_URL}/ws/${roomId}/${username}`;
   }
 
   /**
