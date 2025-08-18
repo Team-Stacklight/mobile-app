@@ -5,9 +5,16 @@ export interface JoinRoomRequest {
   username: string;
 }
 
+export interface HistoryMessage {
+  sender: string;
+  content: string;
+  timestamp: string;
+}
+
 export interface JoinRoomResponse {
   success: boolean;
   message?: string;
+  history?: HistoryMessage[];
 }
 
 export class ChatApiService {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useSimpleAuth } from './SimpleAuthContext';
-import { ChatApiService } from '../services/chatApi';
+import { ChatApiService, HistoryMessage } from '../services/chatApi';
 import { WebSocketService, WebSocketMessage } from '../services/websocketService';
 
 // Mock chat interfaces for hackathon demo
@@ -118,6 +118,27 @@ const MOCK_CHAT_ROOMS: ChatRoom[] = [
     createdBy: MOCK_CHAT_USERS[0],
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 300000).toISOString()
+  },
+  {
+    _id: 'deb2ff93-2671-45ac-87c8-4bdca03cdaa2',
+    name: 'Project Management Session',
+    description: 'Room 2 - Project management discussion',
+    isGroup: true,
+    participants: [MOCK_CHAT_USERS[0], MOCK_CHAT_USERS[2]],
+    admins: [MOCK_CHAT_USERS[0]],
+    lastMessage: {
+      _id: 'msg2',
+      content: 'Welcome to the Project Management session!',
+      sender: MOCK_CHAT_USERS[0],
+      chatRoom: 'deb2ff93-2671-45ac-87c8-4bdca03cdaa2',
+      messageType: 'text',
+      readBy: [],
+      createdAt: new Date(Date.now() - 200000).toISOString(),
+      updatedAt: new Date(Date.now() - 200000).toISOString()
+    },
+    createdBy: MOCK_CHAT_USERS[0],
+    createdAt: new Date(Date.now() - 43200000).toISOString(),
+    updatedAt: new Date(Date.now() - 200000).toISOString()
   }
 ];
 
@@ -296,6 +317,39 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const transformHistoryToMessages = (history: HistoryMessage[], chatRoomId: string): ChatMessage[] => {
+    return history.map((historyMsg, index) => {
+      let messageContent = historyMsg.content;
+      
+      // Handle double-encoded JSON content
+      try {
+        const parsedContent = JSON.parse(historyMsg.content);
+        if (parsedContent.content) {
+          messageContent = parsedContent.content;
+        }
+      } catch {
+        // If parsing fails, use content as-is
+      }
+      
+      return {
+        _id: `history_${historyMsg.timestamp}_${index}`,
+        content: messageContent,
+        sender: {
+          _id: historyMsg.sender.toLowerCase().replace(/\s+/g, '_'),
+          username: historyMsg.sender,
+          email: '',
+          isOnline: true,
+          lastSeen: historyMsg.timestamp
+        },
+        chatRoom: chatRoomId,
+        messageType: 'text' as const,
+        readBy: [],
+        createdAt: historyMsg.timestamp,
+        updatedAt: historyMsg.timestamp
+      };
+    });
+  };
+
   const joinRoom = async (chatRoomId: string): Promise<boolean> => {
     try {
       if (!user) {
@@ -309,6 +363,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       
       if (result.success) {
         console.log('✅ Successfully joined room:', chatRoomId);
+        
+        // Process history if available
+        if (result.history && result.history.length > 0) {
+          console.log('📚 Processing chat history:', result.history.length, 'messages');
+          const historyMessages = transformHistoryToMessages(result.history, chatRoomId);
+          
+          setMessages(prev => ({
+            ...prev,
+            [chatRoomId]: historyMessages
+          }));
+          
+          console.log('✅ Chat history loaded:', historyMessages.length, 'messages');
+        }
+        
         return true;
       } else {
         console.error('❌ Failed to join room:', result.message);
@@ -337,10 +405,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         wsServiceRef.current.disconnect();
       }
 
-      // Try to join the room via API, but continue with WebSocket even if it fails
+      // Try to join the room via API and load history
       const joinSuccess = await joinRoom(chatRoomId);
       if (joinSuccess) {
-        console.log('✅ API join successful, proceeding with WebSocket');
+        console.log('✅ API join successful with history loaded, proceeding with WebSocket');
       } else {
         console.log('⚠️ API join failed, but proceeding with WebSocket connection anyway');
       }
