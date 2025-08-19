@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useSimpleAuth } from './SimpleAuthContext';
-import { ChatApiService, HistoryMessage } from '../services/chatApi';
+import { ChatApiService, HistoryMessage, ApiRoom } from '../services/chatApi';
 import { WebSocketService, WebSocketMessage } from '../services/websocketService';
 
 // Mock chat interfaces for hackathon demo
@@ -58,9 +58,6 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-// Available chat room - using the provided room ID
-const AVAILABLE_ROOM_ID = 'a36c864f-3db2-473b-9122-216324c1563a';
-
 // Mock chat data for hackathon demo
 const MOCK_CHAT_USERS: ChatUser[] = [
   {
@@ -97,66 +94,6 @@ const MOCK_CHAT_USERS: ChatUser[] = [
   }
 ];
 
-const MOCK_CHAT_ROOMS: ChatRoom[] = [
-  {
-    _id: AVAILABLE_ROOM_ID,
-    name: 'Ethics Discussion',
-    description: 'Room 1 - Ethics topic discussion',
-    isGroup: true,
-    participants: [MOCK_CHAT_USERS[0], MOCK_CHAT_USERS[1]],
-    admins: [MOCK_CHAT_USERS[0]],
-    lastMessage: {
-      _id: 'msg1',
-      content: 'Welcome to the Ethics discussion room!',
-      sender: MOCK_CHAT_USERS[0],
-      chatRoom: AVAILABLE_ROOM_ID,
-      messageType: 'text',
-      readBy: [],
-      createdAt: new Date(Date.now() - 300000).toISOString(),
-      updatedAt: new Date(Date.now() - 300000).toISOString()
-    },
-    createdBy: MOCK_CHAT_USERS[0],
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 300000).toISOString()
-  },
-  {
-    _id: 'deb2ff93-2671-45ac-87c8-4bdca03cdaa2',
-    name: 'Project Management Session',
-    description: 'Room 2 - Project management discussion',
-    isGroup: true,
-    participants: [MOCK_CHAT_USERS[0], MOCK_CHAT_USERS[2]],
-    admins: [MOCK_CHAT_USERS[0]],
-    lastMessage: {
-      _id: 'msg2',
-      content: 'Welcome to the Project Management session!',
-      sender: MOCK_CHAT_USERS[0],
-      chatRoom: 'deb2ff93-2671-45ac-87c8-4bdca03cdaa2',
-      messageType: 'text',
-      readBy: [],
-      createdAt: new Date(Date.now() - 200000).toISOString(),
-      updatedAt: new Date(Date.now() - 200000).toISOString()
-    },
-    createdBy: MOCK_CHAT_USERS[0],
-    createdAt: new Date(Date.now() - 43200000).toISOString(),
-    updatedAt: new Date(Date.now() - 200000).toISOString()
-  }
-];
-
-const INITIAL_MESSAGES: { [chatRoomId: string]: ChatMessage[] } = {
-  [AVAILABLE_ROOM_ID]: [
-    {
-      _id: 'msg1',
-      content: 'Welcome to the Ethics discussion room!',
-      sender: MOCK_CHAT_USERS[0],
-      chatRoom: AVAILABLE_ROOM_ID,
-      messageType: 'text',
-      readBy: [],
-      createdAt: new Date(Date.now() - 300000).toISOString(),
-      updatedAt: new Date(Date.now() - 300000).toISOString()
-    }
-  ]
-};
-
 export const useChat = () => {
   const context = useContext(ChatContext);
   if (context === undefined) {
@@ -174,11 +111,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const wsServiceRef = useRef<WebSocketService | null>(null);
   const currentRoomRef = useRef<string | null>(null);
 
-  // Load chat rooms and initialize messages on mount
+  // Load chat rooms on mount
   useEffect(() => {
     if (user) {
       getChatRooms();
-      setMessages(INITIAL_MESSAGES);
     }
   }, [user]);
 
@@ -221,18 +157,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const transformApiRoomToChatRoom = (apiRoom: ApiRoom): ChatRoom => {
+    return {
+      _id: apiRoom.id,
+      name: apiRoom.name,
+      description: `${apiRoom.topic} discussion`,
+      isGroup: true,
+      participants: [MOCK_CHAT_USERS[0], MOCK_CHAT_USERS[1]], // Default participants
+      admins: [MOCK_CHAT_USERS[0]], // Default admin
+      createdBy: MOCK_CHAT_USERS[0], // Default creator
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  };
+
   const getChatRooms = async () => {
     try {
-      console.log('📋 Loading chat rooms...');
+      console.log('📋 Loading chat rooms from API...');
       setLoading(true);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const apiRooms = await ChatApiService.getRooms();
+      const transformedRooms = apiRooms.map(transformApiRoomToChatRoom);
       
-      setChatRooms(MOCK_CHAT_ROOMS);
-      console.log('✅ Chat rooms loaded');
+      setChatRooms(transformedRooms);
+      console.log('✅ Chat rooms loaded:', transformedRooms.length, 'rooms');
     } catch (error) {
       console.error('❌ Error fetching chat rooms:', error);
+      // Fallback to empty array on error
+      setChatRooms([]);
     } finally {
       setLoading(false);
     }

@@ -18,6 +18,13 @@ export interface JoinRoomResponse {
   history?: HistoryMessage[];
 }
 
+export interface ApiRoom {
+  id: string;
+  name: string;
+  topic: string;
+  created_by: string;
+}
+
 export class ChatApiService {
   /**
    * Join a chat room with the given room ID and username
@@ -104,6 +111,37 @@ export class ChatApiService {
    */
   static getWebSocketUrl(roomId: string, username: string): string {
     return `${WS_BASE_URL}/ws/${roomId}/${username}`;
+  }
+
+  /**
+   * Get all available chat rooms
+   */
+  static async getRooms(): Promise<ApiRoom[]> {
+    try {
+      console.log('📋 Fetching rooms from API:', `${API_BASE_URL}/rooms`);
+      
+      const response = await fetch(`${API_BASE_URL}/rooms`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('📥 Get rooms response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('❌ Get rooms error response:', errorText);
+        throw new Error(`Failed to get rooms: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const rooms = await response.json();
+      console.log('✅ Rooms fetched:', rooms.length, 'rooms');
+      return rooms;
+    } catch (error) {
+      console.error('❌ Error fetching rooms:', error);
+      throw error;
+    }
   }
 
   /**

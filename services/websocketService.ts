@@ -109,14 +109,11 @@ export class WebSocketService {
     }
 
     try {
-      const message = {
-        type: 'message',
-        content,
-        timestamp: new Date().toISOString()
-      };
+      console.log('📤 Sending message - Raw content:', content);
       
-      this.ws.send(JSON.stringify(message));
-      console.log('📤 Message sent:', content);
+      // Send just the raw content string, not wrapped in JSON
+      this.ws.send(content);
+      console.log('📤 Message sent successfully');
       return true;
     } catch (error) {
       console.error('❌ Error sending message:', error);
