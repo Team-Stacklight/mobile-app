@@ -58,7 +58,11 @@ function UserAvatar() {
 }
 
 function MessageBubble({ message, currentUserId }: { message: ChatMessage; currentUserId: string }) {
-  const isCurrentUser = message.sender._id === currentUserId;
+  // Check both _id and username for current user identification
+  const isCurrentUserById = message.sender._id === currentUserId;
+  const isCurrentUserByUsername = message.sender.username === 'Dhruv';
+  const isCurrentUser = isCurrentUserById || isCurrentUserByUsername;
+  
   const bubbleBackgroundColor = isCurrentUser ? '#007AFF' : '#F3F4F6';
   const textColor = isCurrentUser ? '#FFF' : '#000';
 
@@ -68,7 +72,7 @@ function MessageBubble({ message, currentUserId }: { message: ChatMessage; curre
   };
 
   return (
-    <View style={[styles.messageContainer, isCurrentUser ? styles.userMessage : styles.botMessage]}>
+    <View style={[styles.messageContainer, isCurrentUser ? styles.userMessage : styles.otherMessage]}>
       {!isCurrentUser && (
         <View style={styles.senderAvatar}>
           <ThemedText style={styles.senderAvatarText}>
@@ -76,14 +80,14 @@ function MessageBubble({ message, currentUserId }: { message: ChatMessage; curre
           </ThemedText>
         </View>
       )}
-      <View style={styles.messageContent}>
+      <View style={[styles.messageContent, isCurrentUser && styles.userMessageContent]}>
         {!isCurrentUser && (
           <ThemedText style={styles.senderName}>{message.sender.username}</ThemedText>
         )}
-        <View style={[styles.messageBubble, { backgroundColor: bubbleBackgroundColor }]}>
+        <View style={[styles.messageBubble, { backgroundColor: bubbleBackgroundColor }, isCurrentUser && styles.userMessageBubble]}>
           <ThemedText style={[styles.messageText, { color: textColor }]}>{message.content}</ThemedText>
         </View>
-        <ThemedText style={styles.messageTime}>{formatTime(message.createdAt)}</ThemedText>
+        <ThemedText style={[styles.messageTime, isCurrentUser && styles.userMessageTime]}>{formatTime(message.createdAt)}</ThemedText>
       </View>
       {isCurrentUser && <UserAvatar />}
     </View>
@@ -310,17 +314,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
+    marginBottom: 16,
   },
-  botMessage: {
+  otherMessage: {
     justifyContent: 'flex-start',
   },
   userMessage: {
     justifyContent: 'flex-end',
+    flexDirection: 'row-reverse',
   },
   messageBubble: {
     maxWidth: '75%',
     padding: 12,
     borderRadius: 18,
+  },
+  userMessageBubble: {
+    borderBottomRightRadius: 4,
   },
   messageText: {
     fontSize: 16,
@@ -398,6 +407,9 @@ const styles = StyleSheet.create({
   messageContent: {
     flex: 1,
   },
+  userMessageContent: {
+    alignItems: 'flex-end',
+  },
   senderName: {
     fontSize: 12,
     color: '#6B7280',
@@ -408,6 +420,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#9CA3AF',
     marginTop: 4,
+  },
+  userMessageTime: {
+    textAlign: 'right',
   },
   loadingContainer: {
     flex: 1,
