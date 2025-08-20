@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ChatApiService, ApiUser } from '../services/chatApi';
 
 // Minimal user interface
 interface SimpleUser {
@@ -19,16 +20,16 @@ interface SimpleAuthContextType {
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   getToken: () => Promise<string | null>;
-  selectUser: (userId: number) => Promise<void>;
-  getMockUsers: () => SimpleUser[];
+  selectUser: (userId: string) => Promise<void>;
+  getUsers: () => Promise<SimpleUser[]>;
 }
 
 const SimpleAuthContext = createContext<SimpleAuthContextType | undefined>(undefined);
 
 const API_BASE_URL = 'http://192.168.68.134:3000/api';
 
-// Mock users for hackathon demo
-const MOCK_USERS: SimpleUser[] = [
+// Fallback users in case API fails
+const FALLBACK_USERS: SimpleUser[] = [
   {
     _id: '1',
     id: 1,
@@ -52,22 +53,6 @@ const MOCK_USERS: SimpleUser[] = [
     email: 'carol@collectiveminds.com',
     avatar: '👩‍🏫',
     role: 'Designer'
-  },
-  {
-    _id: '4',
-    id: 4,
-    username: 'David Wilson',
-    email: 'david@collectiveminds.com',
-    avatar: '👨‍💼',
-    role: 'Manager'
-  },
-  {
-    _id: '5',
-    id: 5,
-    username: 'Emma Brown',
-    email: 'emma@collectiveminds.com',
-    avatar: '👩‍🔬',
-    role: 'Student'
   }
 ];
 
@@ -82,12 +67,39 @@ export const useSimpleAuth = () => {
 export function SimpleAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SimpleUser | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cachedUsers, setCachedUsers] = useState<SimpleUser[]>([]);
+
+  const transformApiUserToSimpleUser = (apiUser: ApiUser, index: number): SimpleUser => {
+    return {
+      _id: apiUser.id,
+      id: index + 1, // For backward compatibility with existing token system
+      username: apiUser.name,
+      email: `${apiUser.name.toLowerCase().replace(/\s+/g, '.')}@questie.com`,
+      avatar: '👤',
+      role: 'User'
+    };
+  };
+
+  const getUsers = async (): Promise<SimpleUser[]> => {
+    try {
+      console.log('👥 Loading users from API...');
+      const apiUsers = await ChatApiService.getUsers();
+      const transformedUsers = apiUsers.map(transformApiUserToSimpleUser);
+      setCachedUsers(transformedUsers);
+      console.log('✅ Users loaded from API:', transformedUsers.length, 'users');
+      return transformedUsers;
+    } catch (error) {
+      console.error('❌ Error fetching users from API, using fallback:', error);
+      setCachedUsers(FALLBACK_USERS);
+      return FALLBACK_USERS;
+    }
+  };
 
   const checkAuth = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('auth_token');
-      console.log('🔍 Checking mock auth with token:', !!token);
+      console.log('🔍 Checking auth with token:', !!token);
       
       if (!token) {
         console.log('ℹ️ No token found');
@@ -96,16 +108,19 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
         return;
       }
 
-      // For hackathon: Parse mock token to get user ID
-      if (token.startsWith('mock_token_user_')) {
-        const userId = parseInt(token.replace('mock_token_user_', ''));
-        const mockUser = MOCK_USERS.find(user => user.id === userId);
+      // Parse token to get user ID
+      if (token.startsWith('token_user_')) {
+        const userId = token.replace('token_user_', '');
         
-        if (mockUser) {
-          console.log('✅ Mock user authenticated:', mockUser.username);
-          setUser(mockUser);
+        // Try to get users from API first
+        const users = cachedUsers.length > 0 ? cachedUsers : await getUsers();
+        const foundUser = users.find(user => user._id === userId);
+        
+        if (foundUser) {
+          console.log('✅ User authenticated:', foundUser.username);
+          setUser(foundUser);
         } else {
-          console.log('❌ Invalid mock token, clearing...');
+          console.log('❌ Invalid token, clearing...');
           await AsyncStorage.removeItem('auth_token');
           setUser(null);
         }
@@ -125,14 +140,15 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // For hackathon: Mock sign in - find user by email
-      const mockUser = MOCK_USERS.find(user => user.email === email);
+      // Get users from API and find by email
+      const users = await getUsers();
+      const foundUser = users.find(user => user.email === email);
       
-      if (mockUser) {
-        const mockToken = `mock_token_user_${mockUser.id}`;
-        await AsyncStorage.setItem('auth_token', mockToken);
-        setUser(mockUser);
-        console.log('✅ Mock sign in successful:', mockUser.username);
+      if (foundUser) {
+        const token = `token_user_${foundUser._id}`;
+        await AsyncStorage.setItem('auth_token', token);
+        setUser(foundUser);
+        console.log('✅ Sign in successful:', foundUser.username);
       } else {
         throw new Error('User not found');
       }
@@ -147,21 +163,22 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
   const signUp = async (username: string, email: string, password: string) => {
     setLoading(true);
     try {
-      // For hackathon: Mock sign up - create a temporary user
-      const newUserId = MOCK_USERS.length + 1;
-      const mockUser = {
-        _id: `mock_${newUserId}`,
-        id: newUserId,
+      // For hackathon: Create a temporary user (not persisted to backend)
+      const users = await getUsers();
+      const newUserId = `temp_${Date.now()}`;
+      const newUser = {
+        _id: newUserId,
+        id: users.length + 1,
         username,
         email,
         avatar: '👤',
         role: 'Student'
       };
       
-      const mockToken = `mock_token_user_${newUserId}`;
-      await AsyncStorage.setItem('auth_token', mockToken);
-      setUser(mockUser);
-      console.log('✅ Mock sign up successful:', mockUser.username);
+      const token = `token_user_${newUserId}`;
+      await AsyncStorage.setItem('auth_token', token);
+      setUser(newUser);
+      console.log('✅ Sign up successful:', newUser.username);
     } catch (error) {
       console.error('❌ Sign up error:', error);
       throw error;
@@ -183,8 +200,7 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
   const getToken = async (): Promise<string | null> => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
-      // For hackathon: Return mock token if it exists and is valid format
-      if (token && token.startsWith('mock_token_user_')) {
+      if (token && token.startsWith('token_user_')) {
         return token;
       }
       return null;
@@ -194,16 +210,16 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const selectUser = async (userId: number): Promise<void> => {
+  const selectUser = async (userId: string): Promise<void> => {
     setLoading(true);
     try {
-      const selectedUser = MOCK_USERS.find(user => user.id === userId);
+      const users = cachedUsers.length > 0 ? cachedUsers : await getUsers();
+      const selectedUser = users.find(user => user._id === userId);
       if (selectedUser) {
-        // Create a mock token for the selected user
-        const mockToken = `mock_token_user_${userId}`;
-        await AsyncStorage.setItem('auth_token', mockToken);
+        const token = `token_user_${userId}`;
+        await AsyncStorage.setItem('auth_token', token);
         setUser(selectedUser);
-        console.log('✅ Mock user selected:', selectedUser.username);
+        console.log('✅ User selected:', selectedUser.username);
       } else {
         throw new Error('User not found');
       }
@@ -215,9 +231,6 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const getMockUsers = (): SimpleUser[] => {
-    return MOCK_USERS;
-  };
 
   const value = {
     user,
@@ -228,7 +241,7 @@ export function SimpleAuthProvider({ children }: { children: React.ReactNode }) 
     checkAuth,
     getToken,
     selectUser,
-    getMockUsers,
+    getUsers,
   };
 
   return (

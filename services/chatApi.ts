@@ -3,7 +3,7 @@ const WS_BASE_URL = process.env.EXPO_PUBLIC_WS_BASE_URL || 'wss://api.dhruvshah.
 
 export interface JoinRoomRequest {
   room_id: string;
-  username: string;
+  userId: string;
 }
 
 export interface HistoryMessage {
@@ -25,11 +25,16 @@ export interface ApiRoom {
   created_by: string;
 }
 
+export interface ApiUser {
+  id: string;
+  name: string;
+}
+
 export class ChatApiService {
   /**
-   * Join a chat room with the given room ID and username
+   * Join a chat room with the given room ID and user ID
    */
-  static async joinRoom(roomId: string, username: string): Promise<JoinRoomResponse> {
+  static async joinRoom(roomId: string, userId: string): Promise<JoinRoomResponse> {
     try {
       // First try to create the room (in case it doesn't exist)
       console.log('🏗️ Trying to create room first...');
@@ -45,7 +50,7 @@ export class ChatApiService {
       
       const requestBody = {
         room_id: roomId,
-        username: username,
+        userId: userId,
       };
       
       const requestBodyString = JSON.stringify(requestBody);
@@ -107,10 +112,10 @@ export class ChatApiService {
   }
 
   /**
-   * Get WebSocket URL for a room and username
+   * Get WebSocket URL for a room and user ID
    */
-  static getWebSocketUrl(roomId: string, username: string): string {
-    return `${WS_BASE_URL}/ws/${roomId}/${username}`;
+  static getWebSocketUrl(roomId: string, userId: string): string {
+    return `${WS_BASE_URL}/ws/${roomId}/${userId}`;
   }
 
   /**
@@ -140,6 +145,37 @@ export class ChatApiService {
       return rooms;
     } catch (error) {
       console.error('❌ Error fetching rooms:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all available users
+   */
+  static async getUsers(): Promise<ApiUser[]> {
+    try {
+      console.log('👥 Fetching users from API:', `${API_BASE_URL}/users`);
+      
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('📥 Get users response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('❌ Get users error response:', errorText);
+        throw new Error(`Failed to get users: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const users = await response.json();
+      console.log('✅ Users fetched:', users.length, 'users');
+      return users;
+    } catch (error) {
+      console.error('❌ Error fetching users:', error);
       throw error;
     }
   }

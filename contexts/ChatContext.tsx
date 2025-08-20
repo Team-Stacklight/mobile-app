@@ -309,9 +309,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      console.log('🚪 Joining room:', chatRoomId, 'as user:', user.username);
+      console.log('🚪 Joining room:', chatRoomId, 'as user:', user.username, 'with ID:', user._id);
       
-      const result = await ChatApiService.joinRoom(chatRoomId, user.username);
+      const result = await ChatApiService.joinRoom(chatRoomId, user._id);
       
       if (result.success) {
         console.log('✅ Successfully joined room:', chatRoomId);
@@ -366,7 +366,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Create WebSocket connection
-      const wsUrl = ChatApiService.getWebSocketUrl(chatRoomId, user.username);
+      const wsUrl = ChatApiService.getWebSocketUrl(chatRoomId, user._id);
       console.log('🔌 Connecting to WebSocket:', wsUrl);
       
       wsServiceRef.current = new WebSocketService(wsUrl, {

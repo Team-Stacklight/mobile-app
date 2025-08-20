@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,19 +7,21 @@ import {
   Alert,
   ScrollView,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 
 interface UserCardProps {
   user: {
+    _id: string;
     id: number;
     username: string;
     email: string;
     avatar?: string;
     role?: string;
   };
-  onSelect: (userId: number) => void;
+  onSelect: (userId: string) => void;
   loading: boolean;
 }
 
@@ -27,7 +29,7 @@ function UserCard({ user, onSelect, loading }: UserCardProps) {
   return (
     <TouchableOpacity
       style={[styles.userCard, loading && styles.userCardDisabled]}
-      onPress={() => onSelect(user.id)}
+      onPress={() => onSelect(user._id)}
       disabled={loading}
     >
       <View style={styles.avatarContainer}>
@@ -46,9 +48,28 @@ function UserCard({ user, onSelect, loading }: UserCardProps) {
 }
 
 export default function LoginScreen() {
-  const { selectUser, getMockUsers, loading } = useSimpleAuth();
+  const { selectUser, getUsers, loading } = useSimpleAuth();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
 
-  const handleUserSelect = async (userId: number) => {
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const fetchedUsers = await getUsers();
+      setUsers(fetchedUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      Alert.alert('Error', 'Failed to load users');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleUserSelect = async (userId: string) => {
     try {
       await selectUser(userId);
       router.replace('/(tabs)');
@@ -56,8 +77,6 @@ export default function LoginScreen() {
       Alert.alert('Error', error.message || 'Failed to select user');
     }
   };
-
-  const mockUsers = getMockUsers();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -70,21 +89,28 @@ export default function LoginScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.userList}>
-          {mockUsers.map((user) => (
-            <UserCard
-              key={user.id}
-              user={user}
-              onSelect={handleUserSelect}
-              loading={loading}
-            />
-          ))}
-        </View>
+        {loadingUsers ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.loadingText}>Loading users...</Text>
+          </View>
+        ) : (
+          <View style={styles.userList}>
+            {users.map((user) => (
+              <UserCard
+                key={user._id}
+                user={user}
+                onSelect={handleUserSelect}
+                loading={loading}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          💡 Hackathon Mode: No real authentication required
+          💡 Hackathon Mode: Select any user to continue
         </Text>
       </View>
     </SafeAreaView>
@@ -212,5 +238,16 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748B',
+    marginTop: 16,
   },
 });
