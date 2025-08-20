@@ -57,10 +57,10 @@ function UserAvatar() {
   );
 }
 
-function MessageBubble({ message, currentUserId }: { message: ChatMessage; currentUserId: string }) {
+function MessageBubble({ message, currentUserId, currentUsername }: { message: ChatMessage; currentUserId: string; currentUsername?: string }) {
   // Check both _id and username for current user identification
   const isCurrentUserById = message.sender._id === currentUserId;
-  const isCurrentUserByUsername = message.sender.username === 'Dhruv';
+  const isCurrentUserByUsername = currentUsername && message.sender.username === currentUsername;
   const isCurrentUser = isCurrentUserById || isCurrentUserByUsername;
   
   const bubbleBackgroundColor = isCurrentUser ? '#007AFF' : '#F3F4F6';
@@ -231,6 +231,7 @@ export default function ChatConversationScreen() {
                 key={message._id} 
                 message={message} 
                 currentUserId={user?._id || ''}
+                currentUsername={user?.username}
               />
             ))
           )}
