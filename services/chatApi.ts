@@ -30,6 +30,14 @@ export interface ApiUser {
   name: string;
 }
 
+export interface RoomDetails {
+  topic: string;
+  id: string;
+  documentation: string;
+  name: string;
+  created_by: string;
+}
+
 export class ChatApiService {
   /**
    * Join a chat room with the given room ID and user ID
@@ -186,6 +194,82 @@ export class ChatApiService {
     } catch (error) {
       console.log('🔍 API health check failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get room analysis by making a POST request to /rooms/:roomId/analysis
+   */
+  static async getRoomAnalysis(roomId: string): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      console.log('📊 Requesting room analysis for:', roomId);
+      
+      const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      console.log('📥 Room analysis response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('❌ Room analysis error response:', errorText);
+        return { 
+          success: false, 
+          message: `Failed to get room analysis: ${response.status} ${response.statusText} - ${errorText}` 
+        };
+      }
+
+      const data = await response.json();
+      console.log('✅ Room analysis response:', data);
+      return { success: true, data };
+    } catch (error) {
+      console.error('❌ Error getting room analysis:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Get room details including documentation
+   */
+  static async getRoomDetails(roomId: string): Promise<{ success: boolean; data?: RoomDetails; message?: string }> {
+    try {
+      console.log('📋 Fetching room details for:', roomId);
+      
+      const response = await fetch(`${API_BASE_URL}/rooms/${roomId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('📥 Get room details response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('❌ Get room details error response:', errorText);
+        return { 
+          success: false, 
+          message: `Failed to get room details: ${response.status} ${response.statusText} - ${errorText}` 
+        };
+      }
+
+      const data = await response.json();
+      console.log('✅ Room details fetched:', data);
+      return { success: true, data };
+    } catch (error) {
+      console.error('❌ Error fetching room details:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
     }
   }
 

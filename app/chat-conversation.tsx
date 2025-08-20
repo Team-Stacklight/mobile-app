@@ -19,6 +19,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ChatMessage, useChat } from '@/contexts/ChatContext';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { ChatApiService } from '@/services/chatApi';
 import Markdown from 'react-native-markdown-display';
 
 
@@ -118,6 +119,8 @@ export default function ChatConversationScreen() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showMenuDrawer, setShowMenuDrawer] = useState(false);
   const [markdownContent, setMarkdownContent] = useState('');
+  const [loadingDocumentation, setLoadingDocumentation] = useState(false);
+  const [documentationError, setDocumentationError] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const backgroundColor = useThemeColor({}, 'background');
@@ -127,170 +130,34 @@ export default function ChatConversationScreen() {
   const { getChatMessages, sendMessage: sendChatMessage, connectToRoom, disconnectFromRoom, messages: contextMessages, isConnected } = useChat();
   const { user } = useSimpleAuth();
 
-  // Load markdown content
+  // Load documentation content dynamically from API
   useEffect(() => {
-    const loadMarkdownContent = async () => {
+    const loadDocumentation = async () => {
+      if (!chatRoomId) return;
+      
+      setLoadingDocumentation(true);
+      setDocumentationError(null);
+      
       try {
-        // Use static markdown string since require doesn't work with .md files in React Native
-        const content = `# Becoming a Good Team Lead
-
-This guide provides practical advice, key skills, and actionable steps to help you grow into an effective and respected team lead.
-
----
-
-## 1. Understanding the Role of a Team Lead
-
-A team lead bridges the gap between management and the team. Your responsibilities go beyond completing tasks — you are responsible for **guiding, supporting, and enabling your team** to succeed.
-
-Key responsibilities:
-- Setting clear goals and expectations.
-- Facilitating communication within the team and with stakeholders.
-- Providing feedback and coaching.
-- Managing conflicts and promoting collaboration.
-- Ensuring delivery of quality work on time.
-- Advocating for the team's needs.
-
----
-
-## 2. Core Skills to Develop
-
-### 2.1 Communication
-- **Active listening**: Understand concerns before responding.
-- **Clarity**: Break down complex goals into clear instructions.
-- **Transparency**: Share context and decisions openly.
-
-### 2.2 Emotional Intelligence
-- Recognize and manage your own emotions.
-- Show empathy toward team members.
-- Adapt your communication style to different personalities.
-
-### 2.3 Decision-Making
-- Gather input from the team when appropriate.
-- Make timely decisions, even with incomplete information.
-- Take ownership of outcomes.
-
----
-
-## 3. Building Trust and Relationships
-
-### 3.1 Be Consistent
-- Follow through on commitments.
-- Maintain consistent standards and expectations.
-- Be reliable in your communication and availability.
-
-### 3.2 Show Vulnerability
-- Admit when you don't know something.
-- Ask for help when needed.
-- Share your own learning experiences.
-
-### 3.3 Invest in Your Team
-- Learn about each team member's goals and motivations.
-- Provide opportunities for growth and development.
-- Celebrate individual and team achievements.
-
----
-
-## 4. Effective Delegation
-
-### 4.1 Match Tasks to Skills
-- Understand each team member's strengths and interests.
-- Assign tasks that challenge but don't overwhelm.
-- Provide context for why the task matters.
-
-### 4.2 Set Clear Expectations
-- Define what success looks like.
-- Establish deadlines and check-in points.
-- Clarify the level of autonomy expected.
-
-### 4.3 Support Without Micromanaging
-- Be available for questions and guidance.
-- Trust your team to find their own solutions.
-- Focus on outcomes, not methods.
-
----
-
-## 5. Managing Conflicts and Difficult Conversations
-
-### 5.1 Address Issues Early
-- Don't let small problems become big ones.
-- Create a safe space for open dialogue.
-- Focus on behaviors and outcomes, not personalities.
-
-### 5.2 Mediate Fairly
-- Listen to all perspectives before making decisions.
-- Remain neutral and objective.
-- Focus on finding solutions, not assigning blame.
-
-### 5.3 Follow Up
-- Check that agreements are being honored.
-- Provide ongoing support as needed.
-- Learn from each conflict to prevent future issues.
-
----
-
-## 6. Leading by Example
-
-### 6.1 Work Ethic
-- Demonstrate the standards you expect from others.
-- Show commitment to quality and deadlines.
-- Maintain a positive attitude, especially during challenges.
-
-### 6.2 Continuous Learning
-- Stay updated with industry trends and best practices.
-- Seek feedback on your own performance.
-- Share your learning with the team.
-
-### 6.3 Collaboration
-- Work well with other teams and stakeholders.
-- Show respect for different viewpoints.
-- Model the collaborative behavior you want to see.
-
----
-
-## 7. Common Mistakes to Avoid
-
-- **Trying to be everyone's friend**: Maintain professional boundaries while being approachable.
-- **Avoiding difficult conversations**: Address issues promptly and directly.
-- **Taking on too much yourself**: Trust your team and delegate effectively.
-- **Not providing enough feedback**: Regular feedback helps team members grow.
-- **Ignoring team dynamics**: Pay attention to how team members interact and address issues.
-- **Failing to advocate for your team**: Stand up for your team's needs and interests.
-
----
-
-## 8. Recommended Resources
-
-- **Books**:
-  - *Leaders Eat Last* by Simon Sinek
-  - *Radical Candor* by Kim Scott
-  - *The Five Dysfunctions of a Team* by Patrick Lencioni
-
-- **Podcasts**:
-  - *Manager Tools*
-  - *Coaching for Leaders*
-
-- **Online Courses**:
-  - Coursera: *Leading People and Teams*
-  - LinkedIn Learning: *Becoming a Manager*
-
----
-
-## 9. Final Thoughts
-
-Becoming a good team lead is less about authority and more about **service, empathy, and guidance**. Your success is measured not by your individual contributions, but by how well your team thrives under your leadership.
-
-> "A leader is best when people barely know he exists.  
-> When his work is done, his aim fulfilled,  
-> they will say: we did it ourselves." — Lao Tzu`;
-        setMarkdownContent(content);
+        const result = await ChatApiService.getRoomDetails(chatRoomId);
+        
+        if (result.success && result.data?.documentation) {
+          setMarkdownContent(result.data.documentation);
+        } else {
+          setDocumentationError(result.message || 'Failed to load documentation');
+          setMarkdownContent('# Documentation\n\nUnable to load documentation content.');
+        }
       } catch (error) {
-        console.error('Error loading markdown content:', error);
+        console.error('Error loading documentation:', error);
+        setDocumentationError('Network error while loading documentation');
         setMarkdownContent('# Documentation\n\nUnable to load documentation content.');
+      } finally {
+        setLoadingDocumentation(false);
       }
     };
 
-    loadMarkdownContent();
-  }, []);
+    loadDocumentation();
+  }, [chatRoomId]);
 
   // Load messages on mount and connect to room
   useEffect(() => {
@@ -478,13 +345,58 @@ Becoming a good team lead is less about authority and more about **service, empa
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalContent}>
-              {markdownContent ? (
+              {loadingDocumentation ? (
+                <View style={styles.loadingContainer}>
+                  <ThemedText style={styles.loadingText}>Loading documentation...</ThemedText>
+                </View>
+              ) : documentationError ? (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="warning" size={24} color="#EF4444" />
+                  <ThemedText style={styles.errorText}>
+                    Failed to load documentation
+                  </ThemedText>
+                  <ThemedText style={styles.errorSubtext}>
+                    {documentationError}
+                  </ThemedText>
+                  <TouchableOpacity 
+                    style={styles.retryButton}
+                    onPress={() => {
+                      const loadDocumentation = async () => {
+                        if (!chatRoomId) return;
+                        
+                        setLoadingDocumentation(true);
+                        setDocumentationError(null);
+                        
+                        try {
+                          const result = await ChatApiService.getRoomDetails(chatRoomId);
+                          
+                          if (result.success && result.data?.documentation) {
+                            setMarkdownContent(result.data.documentation);
+                          } else {
+                            setDocumentationError(result.message || 'Failed to load documentation');
+                            setMarkdownContent('# Documentation\n\nUnable to load documentation content.');
+                          }
+                        } catch (error) {
+                          console.error('Error loading documentation:', error);
+                          setDocumentationError('Network error while loading documentation');
+                          setMarkdownContent('# Documentation\n\nUnable to load documentation content.');
+                        } finally {
+                          setLoadingDocumentation(false);
+                        }
+                      };
+                      loadDocumentation();
+                    }}
+                  >
+                    <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : markdownContent ? (
                 <Markdown style={markdownStyles}>
                   {markdownContent}
                 </Markdown>
               ) : (
                 <ThemedText style={styles.modalText}>
-                  Loading documentation...
+                  No documentation available
                 </ThemedText>
               )}
             </ScrollView>
@@ -942,5 +854,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#EF4444',
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
