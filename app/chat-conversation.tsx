@@ -1,26 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
   Alert,
   Image,
   KeyboardAvoidingView,
-  Platform,
   Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
 
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useChat, ChatMessage } from '@/contexts/ChatContext';
+import { ChatMessage, useChat } from '@/contexts/ChatContext';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import Markdown from 'react-native-markdown-display';
 
 
@@ -41,10 +39,10 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
   const isCurrentUserById = message.sender._id === currentUserId;
   const isCurrentUserByUsername = currentUsername && message.sender.username === currentUsername;
   const isCurrentUser = isCurrentUserById || isCurrentUserByUsername;
-  
+
   // Check if message is from Questie AI agent
   const isQuestieAgent = message.sender.username === 'Questie';
-  
+
   // Set background color based on message type
   let bubbleBackgroundColor = '#F3F4F6'; // Default gray for other users
   if (isCurrentUser) {
@@ -52,7 +50,7 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
   } else if (isQuestieAgent) {
     bubbleBackgroundColor = '#D1FAE5'; // Light green for Questie AI agent
   }
-  
+
   const textColor = isCurrentUser ? '#FFF' : '#000';
 
   const formatTime = (dateString: string) => {
@@ -65,8 +63,8 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
       {!isCurrentUser && (
         <View style={styles.senderAvatar}>
           {isQuestieAgent ? (
-            <Image 
-              source={require('@/assets/images/questie-avatar.png')} 
+            <Image
+              source={require('@/assets/images/questie-avatar.png')}
               style={styles.questieAvatarImage}
             />
           ) : (
@@ -89,7 +87,7 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
   );
 }
 
-function Header({ chatName, onDocsPress }: { chatName: string; onDocsPress: () => void }) {
+function Header({ chatName, onMenuPress }: { chatName: string; onMenuPress: () => void }) {
   const router = useRouter();
   const textColor = useThemeColor({}, 'text');
 
@@ -100,30 +98,32 @@ function Header({ chatName, onDocsPress }: { chatName: string; onDocsPress: () =
         <ThemedText style={[styles.backText, { color: textColor }]}>Back</ThemedText>
       </TouchableOpacity>
       <ThemedText style={styles.headerTitle}>{chatName}</ThemedText>
-      <TouchableOpacity style={styles.docsButton} onPress={onDocsPress}>
-        <Ionicons name="document-text" size={24} color={textColor} />
+      <TouchableOpacity style={styles.menuButton} onPress={onMenuPress}>
+        <Ionicons name="ellipsis-vertical" size={24} color={textColor} />
       </TouchableOpacity>
     </View>
   );
 }
 
 export default function ChatConversationScreen() {
-  const { chatName = 'Chat', chatRoomId } = useLocalSearchParams<{ 
-    chatName: string; 
-    chatRoomId: string; 
+  const { chatName = 'Chat', chatRoomId } = useLocalSearchParams<{
+    chatName: string;
+    chatRoomId: string;
   }>();
-  
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showMenuDrawer, setShowMenuDrawer] = useState(false);
   const [markdownContent, setMarkdownContent] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
-  
+
   const backgroundColor = useThemeColor({}, 'background');
   const inputBackgroundColor = useThemeColor({ light: '#F3F4F6', dark: '#2A2D31' }, 'background');
   const textColor = useThemeColor({}, 'text');
-  
+
   const { getChatMessages, sendMessage: sendChatMessage, connectToRoom, disconnectFromRoom, messages: contextMessages, isConnected } = useChat();
   const { user } = useSimpleAuth();
 
@@ -288,7 +288,7 @@ Becoming a good team lead is less about authority and more about **service, empa
         setMarkdownContent('# Documentation\n\nUnable to load documentation content.');
       }
     };
-    
+
     loadMarkdownContent();
   }, []);
 
@@ -297,7 +297,7 @@ Becoming a good team lead is less about authority and more about **service, empa
     if (chatRoomId && user) {
       loadMessages();
       connectToRoom(chatRoomId);
-      
+
       return () => {
         disconnectFromRoom();
       };
@@ -309,19 +309,19 @@ Becoming a good team lead is less about authority and more about **service, empa
     console.log('🔄 Chat conversation: Context messages changed');
     console.log('🔄 Current chatRoomId:', chatRoomId);
     console.log('🔄 Context messages for room:', contextMessages[chatRoomId]?.length || 0);
-    
+
     if (chatRoomId && contextMessages[chatRoomId]) {
       const newMessages = contextMessages[chatRoomId];
       console.log('🔄 Setting messages:', newMessages.length);
       setMessages(newMessages);
-      
+
       // Auto scroll to bottom when new messages arrive
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
   }, [contextMessages, chatRoomId]);
-  
+
   // Debug: Log when messages state changes
   useEffect(() => {
     console.log('🔄 Local messages state changed:', messages.length);
@@ -347,115 +347,222 @@ Becoming a good team lead is less about authority and more about **service, empa
   };
 
   const sendMessage = async () => {
-    if (inputText.trim() && chatRoomId) {
-      const messageContent = inputText.trim();
+    if (!inputText.trim() || !user) return;
+
+    try {
+      await sendChatMessage(chatRoomId!, inputText.trim());
       setInputText('');
-      
-      try {
-        await sendChatMessage(chatRoomId, messageContent);
-        // Message will be added via WebSocket listener or fallback
-      } catch (error) {
-        console.error('Error sending message:', error);
-        Alert.alert('Error', 'Failed to send message. Please try again.');
-        // Restore input text on error
-        setInputText(messageContent);
-      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
     }
+  };
+
+  const router = useRouter();
+
+  const handleDeleteRoom = () => {
+    Alert.alert(
+      'Delete Room',
+      'Are you sure you want to delete this chat room? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // TODO: Implement delete room API call
+              Alert.alert('Success', 'Room deleted successfully!');
+              // Navigate back to chat list
+              router.back();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete room. Please try again.');
+              console.error('Error deleting room:', error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom', 'top']}>
-        <Header 
-          chatName={`${chatName}${isConnected ? ' 🟢' : ' 🔴'}`} 
-          onDocsPress={() => setShowDocsModal(true)}
+        <Header
+          chatName={`${chatName}${isConnected ? ' 🟢' : ' 🔴'}`}
+          onMenuPress={() => setShowMenuDrawer(true)}
         />
-      
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
+
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ThemedText style={styles.loadingText}>Loading messages...</ThemedText>
-            </View>
-          ) : messages.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
-              <ThemedText style={styles.emptySubtext}>Start the conversation!</ThemedText>
-            </View>
-          ) : (
-            messages.map((message) => (
-              <MessageBubble 
-                key={message._id} 
-                message={message} 
-                currentUserId={user?._id || ''}
-                currentUsername={user?.username}
-              />
-            ))
-          )}
-        </ScrollView>
-        
-        {/* INPUT AREA */}
-        <View style={styles.inputWrapper}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={`Message ${chatName}...`}
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity 
-              style={styles.sendButton}
-              onPress={sendMessage}
-              disabled={!inputText.trim()}
-            >
-              <Ionicons name="send" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-      
-      {/* Documentation Modal */}
-      <Modal
-        visible={showDocsModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowDocsModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <ThemedText style={styles.modalTitle}>Learning Documentation</ThemedText>
-            <TouchableOpacity 
-              style={styles.modalCloseButton}
-              onPress={() => setShowDocsModal(false)}
-            >
-              <Ionicons name="close" size={24} color={textColor} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.modalContent}>
-            {markdownContent ? (
-              <Markdown style={markdownStyles}>
-                {markdownContent}
-              </Markdown>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.messagesContainer}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ThemedText style={styles.loadingText}>Loading messages...</ThemedText>
+              </View>
+            ) : messages.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <ThemedText style={styles.emptyText}>No messages yet</ThemedText>
+                <ThemedText style={styles.emptySubtext}>Start the conversation!</ThemedText>
+              </View>
             ) : (
-              <ThemedText style={styles.modalText}>
-                Loading documentation...
-              </ThemedText>
+              messages.map((message) => (
+                <MessageBubble
+                  key={message._id}
+                  message={message}
+                  currentUserId={user?._id || ''}
+                  currentUsername={user?.username}
+                />
+              ))
             )}
           </ScrollView>
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
+
+          {/* INPUT AREA */}
+          <View style={styles.inputWrapper}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={`Message ${chatName}...`}
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={sendMessage}
+                disabled={!inputText.trim()}
+              >
+                <Ionicons name="send" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+
+        {/* Documentation Modal */}
+        <Modal
+          visible={showDocsModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowDocsModal(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Learning Documentation</ThemedText>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowDocsModal(false)}
+              >
+                <Ionicons name="close" size={24} color={textColor} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalContent}>
+              {markdownContent ? (
+                <Markdown style={markdownStyles}>
+                  {markdownContent}
+                </Markdown>
+              ) : (
+                <ThemedText style={styles.modalText}>
+                  Loading documentation...
+                </ThemedText>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Help Modal */}
+        <Modal
+          visible={showHelpModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowHelpModal(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Help</ThemedText>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowHelpModal(false)}
+              >
+                <Ionicons name="close" size={24} color={textColor} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalContent}>
+              <Markdown style={markdownStyles}>
+                {`# Welcome!
+
+To start the session supply the command "/start"
+
+If you need a hint you can use the command "/hint"
+
+Questie will listen in on your conversation and try to help you with your tasks and give you pointers.
+
+If you need to end the session supply the command "/end"`}
+              </Markdown>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Menu Drawer */}
+        <Modal
+          visible={showMenuDrawer}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowMenuDrawer(false)}
+        >
+          <TouchableOpacity
+            style={styles.drawerOverlay}
+            activeOpacity={1}
+            onPress={() => setShowMenuDrawer(false)}
+          >
+            <View style={styles.drawerContainer}>
+              <TouchableOpacity
+                style={styles.drawerItem}
+                onPress={() => {
+                  setShowMenuDrawer(false);
+                  setShowDocsModal(true);
+                }}
+              >
+                <Ionicons name="document-text" size={20} color="#374151" />
+                <ThemedText style={styles.drawerItemText}>Documentation</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.drawerItem}
+                onPress={() => {
+                  setShowMenuDrawer(false);
+                  setShowHelpModal(true);
+                }}
+              >
+                <Ionicons name="help-circle" size={20} color="#374151" />
+                <ThemedText style={styles.drawerItemText}>Help</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.drawerItem, styles.deleteItem]}
+                onPress={() => {
+                  setShowMenuDrawer(false);
+                  handleDeleteRoom();
+                }}
+              >
+                <Ionicons name="trash" size={20} color="#EF4444" />
+                <ThemedText style={[styles.drawerItemText, styles.deleteItemText]}>Delete Room</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </SafeAreaView>
     </>
   );
 }
@@ -588,10 +695,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 40,
   },
-  docsButton: {
+  menuButton: {
     padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   messagesContainer: {
     flex: 1,
@@ -775,5 +880,37 @@ const styles = StyleSheet.create({
   modalText: {
     fontSize: 16,
     lineHeight: 24,
+  },
+  drawerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  drawerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    minHeight: 150,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 12,
+  },
+  drawerItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  deleteItem: {
+    backgroundColor: '#FEF2F2',
+  },
+  deleteItemText: {
+    color: '#EF4444',
   },
 });
