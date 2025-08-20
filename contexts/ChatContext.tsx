@@ -13,7 +13,7 @@ interface ChatUser {
   lastSeen: string;
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   _id: string;
   content: string;
   sender: ChatUser;

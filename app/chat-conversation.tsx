@@ -5,38 +5,22 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Image,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useChat } from '@/contexts/ChatContext';
+import { useChat, ChatMessage } from '@/contexts/ChatContext';
 import { useSimpleAuth } from '@/contexts/SimpleAuthContext';
 
-interface ChatMessage {
-  _id: string;
-  content: string;
-  sender: {
-    _id: string;
-    username: string;
-    email: string;
-  };
-  chatRoom: string;
-  messageType: 'text' | 'image' | 'file';
-  readBy: Array<{
-    user: string;
-    readAt: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
 
 function BotAvatar() {
   return (
@@ -49,13 +33,6 @@ function BotAvatar() {
   );
 }
 
-function UserAvatar() {
-  return (
-    <View style={styles.userAvatar}>
-      <Ionicons name="person" size={16} color="white" />
-    </View>
-  );
-}
 
 function MessageBubble({ message, currentUserId, currentUsername }: { message: ChatMessage; currentUserId: string; currentUsername?: string }) {
   // Check both _id and username for current user identification
@@ -63,7 +40,17 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
   const isCurrentUserByUsername = currentUsername && message.sender.username === currentUsername;
   const isCurrentUser = isCurrentUserById || isCurrentUserByUsername;
   
-  const bubbleBackgroundColor = isCurrentUser ? '#007AFF' : '#F3F4F6';
+  // Check if message is from Questie AI agent
+  const isQuestieAgent = message.sender.username === 'Questie';
+  
+  // Set background color based on message type
+  let bubbleBackgroundColor = '#F3F4F6'; // Default gray for other users
+  if (isCurrentUser) {
+    bubbleBackgroundColor = '#007AFF'; // Blue for current user
+  } else if (isQuestieAgent) {
+    bubbleBackgroundColor = '#D1FAE5'; // Light green for Questie AI agent
+  }
+  
   const textColor = isCurrentUser ? '#FFF' : '#000';
 
   const formatTime = (dateString: string) => {
@@ -75,9 +62,16 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
     <View style={[styles.messageContainer, isCurrentUser ? styles.userMessage : styles.otherMessage]}>
       {!isCurrentUser && (
         <View style={styles.senderAvatar}>
-          <ThemedText style={styles.senderAvatarText}>
-            {message.sender.username.charAt(0).toUpperCase()}
-          </ThemedText>
+          {isQuestieAgent ? (
+            <Image 
+              source={require('@/assets/images/questie-avatar.png')} 
+              style={styles.questieAvatarImage}
+            />
+          ) : (
+            <ThemedText style={styles.senderAvatarText}>
+              {message.sender.username.charAt(0).toUpperCase()}
+            </ThemedText>
+          )}
         </View>
       )}
       <View style={[styles.messageContent, isCurrentUser && styles.userMessageContent]}>
@@ -89,7 +83,6 @@ function MessageBubble({ message, currentUserId, currentUsername }: { message: C
         </View>
         <ThemedText style={[styles.messageTime, isCurrentUser && styles.userMessageTime]}>{formatTime(message.createdAt)}</ThemedText>
       </View>
-      {isCurrentUser && <UserAvatar />}
     </View>
   );
 }
@@ -404,6 +397,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  questieAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   messageContent: {
     flex: 1,
