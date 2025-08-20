@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +20,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import AnimatedScreenWrapper from '@/components/AnimatedScreenWrapper';
 import StandardHeader from '@/components/StandardHeader';
 import { useChat } from '@/contexts/ChatContext';
+import { ChatApiService } from '@/services/chatApi';
 
 interface ChatRoom {
   _id: string;
@@ -116,6 +120,11 @@ export default function ChatListScreen() {
   const router = useRouter();
   const backgroundColor = useThemeColor({}, 'background');
   const { chatRooms, loading, getChatRooms } = useChat();
+  
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [roomName, setRoomName] = useState('');
+  const [roomTopic, setRoomTopic] = useState('');
+  const [creating, setCreating] = useState(false);
 
   // Refresh chat rooms on mount
   useEffect(() => {
@@ -137,8 +146,43 @@ export default function ChatListScreen() {
   };
 
   const handleNewChat = () => {
-    router.push('/new-chat');
+    setShowCreateModal(true);
   };
+
+  const handleCreateRoom = async () => {
+    if (!roomName.trim() || !roomTopic.trim()) {
+      Alert.alert('Error', 'Please enter both room name and topic');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const result = await ChatApiService.createRoom(roomName.trim(), roomTopic.trim());
+      
+      if (result.success) {
+        Alert.alert('Success', 'Room created successfully!');
+        setShowCreateModal(false);
+        setRoomName('');
+        setRoomTopic('');
+        // Refresh the chat list to show the new room
+        getChatRooms();
+      } else {
+        Alert.alert('Error', result.message || 'Failed to create room');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create room. Please try again.');
+      console.error('Error creating room:', error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCancelCreate = () => {
+    setShowCreateModal(false);
+    setRoomName('');
+    setRoomTopic('');
+  };
+
 
   return (
     <AnimatedScreenWrapper>
@@ -178,6 +222,60 @@ export default function ChatListScreen() {
             ))
           )}
         </ScrollView>
+        
+        {/* Create Room Modal */}
+        <Modal
+          visible={showCreateModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={handleCancelCreate}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={handleCancelCreate} style={styles.modalCancelButton}>
+                <ThemedText style={styles.modalCancelText}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <ThemedText style={styles.modalTitle}>New Chat Room</ThemedText>
+              <TouchableOpacity 
+                onPress={handleCreateRoom} 
+                style={[styles.modalCreateButton, { opacity: creating ? 0.6 : 1 }]}
+                disabled={creating}
+              >
+                <ThemedText style={styles.modalCreateText}>
+                  {creating ? 'Creating...' : 'Create'}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.inputLabel}>Room Name</ThemedText>
+                <TextInput
+                  style={styles.textInput}
+                  value={roomName}
+                  onChangeText={setRoomName}
+                  placeholder="Enter room name..."
+                  placeholderTextColor="#9CA3AF"
+                  autoFocus
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.inputLabel}>Topic</ThemedText>
+                <TextInput
+                  style={[styles.textInput, styles.topicInput]}
+                  value={roomTopic}
+                  onChangeText={setRoomTopic}
+                  placeholder="What will you discuss in this room?"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </AnimatedScreenWrapper>
   );
@@ -295,5 +393,65 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     color: '#9CA3AF',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  modalCancelButton: {
+    padding: 8,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: '#007AFF',
+  },
+  modalCreateButton: {
+    padding: 8,
+  },
+  modalCreateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  inputGroup: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#F9FAFB',
+    color: '#000000',
+  },
+  topicInput: {
+    height: 80,
+    textAlignVertical: 'top',
   },
 });
