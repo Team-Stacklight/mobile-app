@@ -408,6 +408,16 @@ Becoming a good team lead is less about authority and more about **service, empa
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Info Message */}
+            <View style={styles.infoMessageContainer}>
+              <View style={styles.infoMessage}>
+                <Ionicons name="information-circle" size={16} color="#6B7280" />
+                <ThemedText style={styles.infoMessageText}>
+                  Tap the ⋯ button above to access Help and Documentation
+                </ThemedText>
+              </View>
+            </View>
+
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ThemedText style={styles.loadingText}>Loading messages...</ThemedText>
@@ -912,5 +922,25 @@ const styles = StyleSheet.create({
   },
   deleteItemText: {
     color: '#EF4444',
+  },
+  infoMessageContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  infoMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  infoMessageText: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
   },
 });
