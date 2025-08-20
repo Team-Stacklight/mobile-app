@@ -190,16 +190,16 @@ export class ChatApiService {
   }
 
   /**
-   * Try to create the room first (in case it doesn't exist)
+   * Create a new chat room with name and topic
    */
-  static async createRoom(): Promise<{ success: boolean; roomId?: string; message?: string }> {
+  static async createRoom(roomName: string, topic: string, createdBy: string = "Admin"): Promise<{ success: boolean; roomId?: string; message?: string }> {
     try {
       console.log('🏗️ Attempting to create room via API:', `${API_BASE_URL}/rooms`);
       
       const requestBody = {
-        room_name: "Ethics Discussion",
-        topic: "Ethics",
-        created_by: "Admin"
+        room_name: roomName,
+        topic: topic,
+        created_by: createdBy
       };
       
       console.log('📤 Create room request body:', requestBody);
