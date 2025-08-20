@@ -36,15 +36,6 @@ export class ChatApiService {
    */
   static async joinRoom(roomId: string, userId: string): Promise<JoinRoomResponse> {
     try {
-      // First try to create the room (in case it doesn't exist)
-      console.log('🏗️ Trying to create room first...');
-      const createResult = await this.createRoom();
-      if (createResult.success) {
-        console.log('✅ Room created or already exists');
-      } else {
-        console.log('⚠️ Room creation failed, but continuing with join attempt');
-      }
-      
       const joinUrl = `${API_BASE_URL}/rooms/join`;
       console.log('🌐 Attempting to join room via API:', joinUrl);
       
