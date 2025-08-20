@@ -20,12 +20,13 @@ import { ChatApiService } from '@/services/chatApi';
 interface AnalysisData {
   room_id: string;
   analysis: {
+    text_summary: string;
     knowledge: number;
     understanding: number;
     engagement: number;
     participation: number;
     contribution: number;
-    help_needed: number;
+    independent_understanding: number;
   };
 }
 
@@ -74,14 +75,49 @@ function MetricCard({ title, value, icon, color }: MetricCardProps) {
   );
 }
 
+function TextSummary({ summary }: { summary: string }) {
+  const textColor = useThemeColor({}, 'text');
+  const subtextColor = useThemeColor({ light: '#6B7280', dark: '#9CA3AF' }, 'text');
+  const cardBackgroundColor = useThemeColor({ light: '#F9FAFB', dark: '#1F2937' }, 'background');
+  
+  return (
+    <View style={[styles.summaryCard, { backgroundColor: cardBackgroundColor }]}>
+      <View style={styles.summaryHeader}>
+        <Ionicons name="document-text" size={20} color="#007AFF" />
+        <ThemedText style={[styles.summaryTitle, { color: textColor }]}>Analysis Summary</ThemedText>
+      </View>
+      <ThemedText style={[styles.summaryText, { color: subtextColor }]}>
+        {summary}
+      </ThemedText>
+    </View>
+  );
+}
+
 function OverallScore({ analysis }: { analysis: AnalysisData['analysis'] }) {
   const textColor = useThemeColor({}, 'text');
   const subtextColor = useThemeColor({ light: '#6B7280', dark: '#9CA3AF' }, 'text');
   const cardBackgroundColor = useThemeColor({ light: '#F9FAFB', dark: '#1F2937' }, 'background');
   
-  const totalScore = Object.values(analysis).reduce((sum, value) => sum + value, 0);
-  const averageScore = totalScore / Object.keys(analysis).length;
+  // Extract only numeric metrics, excluding text_summary
+  const numericMetrics = {
+    knowledge: analysis.knowledge,
+    understanding: analysis.understanding,
+    engagement: analysis.engagement,
+    participation: analysis.participation,
+    contribution: analysis.contribution,
+    independent_understanding: analysis.independent_understanding,
+  };
+  
+  const validScores = Object.values(numericMetrics).filter(value => typeof value === 'number' && !isNaN(value));
+  const totalScore = validScores.reduce((sum, value) => sum + value, 0);
+  const averageScore = validScores.length > 0 ? totalScore / validScores.length : 0;
   const overallPercentage = (averageScore / 10) * 100;
+  
+  // Debug logging
+  console.log('Analysis data:', analysis);
+  console.log('Valid scores:', validScores);
+  console.log('Total score:', totalScore);
+  console.log('Average score:', averageScore);
   
   const getScoreColor = (score: number) => {
     if (score >= 8) return '#10B981'; // Green
@@ -215,12 +251,16 @@ export default function RoomAnalysisScreen() {
       { key: 'engagement', title: 'Engagement', icon: 'heart', color: '#EF4444' },
       { key: 'participation', title: 'Participation', icon: 'chatbubbles', color: '#10B981' },
       { key: 'contribution', title: 'Contribution', icon: 'add-circle', color: '#F59E0B' },
-      { key: 'help_needed', title: 'Help Needed', icon: 'help-circle', color: '#6B7280' },
+      { key: 'independent_understanding', title: 'Independent Understanding', icon: 'checkmark-circle', color: '#6B7280' },
     ];
 
     return (
       <View style={styles.analysisContainer}>
         <OverallScore analysis={analysisData.analysis} />
+        
+        {analysisData.analysis.text_summary && (
+          <TextSummary summary={analysisData.analysis.text_summary} />
+        )}
         
         <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
           Detailed Metrics
@@ -231,7 +271,7 @@ export default function RoomAnalysisScreen() {
             <MetricCard
               key={config.key}
               title={config.title}
-              value={analysisData.analysis[config.key as keyof typeof analysisData.analysis]}
+              value={analysisData.analysis[config.key as keyof typeof analysisData.analysis] as number}
               icon={config.icon}
               color={config.color}
             />
@@ -458,5 +498,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     minWidth: 32,
     textAlign: 'right',
+  },
+  // Text Summary Card Styles
+  summaryCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  summaryText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
